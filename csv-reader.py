@@ -218,6 +218,9 @@ class CSVReaderApp(QMainWindow):
         
         # Install event filter for key events at application level
         QApplication.instance().installEventFilter(self)
+        
+        # Load the last viewed file if it exists
+        self.loadLastViewedFile()
     
     def initUI(self):
         """Initialize the user interface"""
@@ -346,7 +349,7 @@ class CSVReaderApp(QMainWindow):
         view_menu.addAction(toggle_view_action)
         
         # Status bar
-        self.statusBar().showMessage('Ready')
+        self.statusBar().showMessage(f'Ready | {self.VERSION}')
         
         # Center window on screen
         screen_size = QApplication.primaryScreen().size()
@@ -438,7 +441,7 @@ class CSVReaderApp(QMainWindow):
         
         for i, file_path in enumerate(recent_files):
             if i < self.MAX_RECENT_FILES and os.path.exists(file_path):
-                action = QAction(f"&{i+1} {os.path.basename(file_path)}", self)
+                action = QAction(f"&{i+1} {file_path}", self)
                 action.setData(file_path)
                 action.triggered.connect(lambda checked, file_path=file_path: self.openRecentFile(file_path))
                 self.recent_files_menu.addAction(action)
@@ -480,6 +483,12 @@ class CSVReaderApp(QMainWindow):
         """Clear the recent files list"""
         self.settings.setValue("recentFiles", [])
         self.updateRecentFilesMenu()
+    
+    def loadLastViewedFile(self):
+        """Load the last viewed CSV file on startup"""
+        last_file = self.settings.value("lastViewedFile", "")
+        if last_file and os.path.exists(last_file):
+            self.loadCSVFile(last_file)
     
     def openRecentFile(self, file_path):
         """Open a file from the recent files menu"""
@@ -531,7 +540,7 @@ class CSVReaderApp(QMainWindow):
             
             # Update UI
             self.current_file_path = file_path
-            self.setWindowTitle(f"CSV Reader - {os.path.basename(file_path)}")
+            self.setWindowTitle(f"CSV Reader - {file_path}")
             
             # Display data based on current view mode
             if self.current_view_mode == "record":
@@ -541,6 +550,9 @@ class CSVReaderApp(QMainWindow):
             
             # Add to recent files
             self.addToRecentFiles(file_path)
+            
+            # Save as last viewed file
+            self.settings.setValue("lastViewedFile", file_path)
             
             # Update status
             self.updateStatusBar()
