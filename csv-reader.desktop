@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=CSV Reader
+Comment=A PyQt6-based application for viewing CSV files with record and table view modes
+Exec=python3 %U /home/juren/Projects/csv-reader/csv-reader.py
+Icon=/home/juren/Projects/csv-reader/icons/ICON_csv-reader.png
+Terminal=false
+Categories=Office;Development;Utility;
+MimeType=text/csv;
+Keywords=csv;viewer;table;record;data;
+StartupNotify=true
+StartupWMClass=CSV Reader

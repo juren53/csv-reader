@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Application Icon**: Set window icon using icons/ICON_csv-reader.png
+- **Changelog Menu Item**: New "Changelog" option in Help menu that displays CHANGELOG.md content
+- **Icons Directory**: Added three PNG icon files (ICON_csv-reader.png, ICON_csv-reader-1.png, ICON_csv-reader-2.png)
+- **Desktop File**: csv-reader.desktop for system menu integration
+
 ## [0.0.3] - 2025-12-12
 
 ### Added
