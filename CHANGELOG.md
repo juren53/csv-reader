@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- Command line argument support: Application can now be launched with a CSV file path as argument
+  - Opens specified CSV file on startup when file path provided
+  - Falls back to loading last viewed file when no argument provided
+
+### Changed
+- Deferred auto-load of last viewed file to after window is shown for better startup behavior
+
 ## [0.0.2] - 2025-12-11
 
 ### Added
