@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
                            QLineEdit, QPushButton)
 from PyQt6.QtCore import Qt, QSettings, QSize, QEvent
-from PyQt6.QtGui import QFont, QKeySequence, QFontMetrics, QPalette, QAction, QColor
+from PyQt6.QtGui import QFont, QKeySequence, QFontMetrics, QPalette, QAction, QColor, QIcon
 
 class TableView(QTableWidget):
     """Widget to display CSV data in a spreadsheet-like table format"""
@@ -325,6 +325,11 @@ class CSVReaderApp(QMainWindow):
         self.setWindowTitle("CSV Reader")
         self.setMinimumSize(800, 600)
         
+        # Set application icon
+        icon_path = os.path.join(os.path.dirname(__file__), "icons", "ICON_csv-reader.png")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
+        
         # Create central widget and layout
         central_widget = QWidget()
         main_layout = QVBoxLayout(central_widget)
@@ -492,6 +497,11 @@ class CSVReaderApp(QMainWindow):
         quick_ref_action.setShortcut(QKeySequence('F1'))
         quick_ref_action.triggered.connect(self.showQuickReference)
         help_menu.addAction(quick_ref_action)
+        
+        # Changelog action
+        changelog_action = QAction('&Changelog', self)
+        changelog_action.triggered.connect(self.showChangelog)
+        help_menu.addAction(changelog_action)
         
         # Separator
         help_menu.addSeparator()
@@ -739,6 +749,31 @@ class CSVReaderApp(QMainWindow):
         msg.setWindowTitle("Quick Reference")
         msg.setTextFormat(Qt.TextFormat.RichText)
         msg.setText(quick_ref_text)
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg.exec()
+    
+    def showChangelog(self):
+        """Display changelog dialog"""
+        changelog_path = os.path.join(os.path.dirname(__file__), "CHANGELOG.md")
+        changelog_text = ""
+        
+        try:
+            if os.path.exists(changelog_path):
+                with open(changelog_path, 'r', encoding='utf-8') as f:
+                    changelog_text = f.read()
+            else:
+                changelog_text = "CHANGELOG.md file not found."
+        except Exception as e:
+            changelog_text = f"Error reading CHANGELOG.md: {str(e)}"
+        
+        # Convert markdown to basic HTML for display
+        changelog_html = changelog_text.replace('\n', '<br>').replace('**', '<b>').replace('**', '</b>')
+        
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Changelog")
+        msg.setTextFormat(Qt.TextFormat.RichText)
+        msg.setText(changelog_html)
         msg.setIcon(QMessageBox.Icon.Information)
         msg.setStandardButtons(QMessageBox.StandardButton.Ok)
         msg.exec()
