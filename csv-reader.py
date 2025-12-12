@@ -291,7 +291,7 @@ class CSVReaderApp(QMainWindow):
     """Main application window for CSV Reader"""
     
     MAX_RECENT_FILES = 10
-    VERSION = "v0.0.2  2025-12-11  18:25"
+    VERSION = "v0.0.3  2025-12-12  01:45"
     
     def __init__(self):
         super().__init__()

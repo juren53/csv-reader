@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.0.3] - 2025-12-12
+
 ### Added
 - Command line argument support: Application can now be launched with a CSV file path as argument
   - Opens specified CSV file on startup when file path provided
@@ -13,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 - Deferred auto-load of last viewed file to after window is shown for better startup behavior
+- Version updated to v0.0.3 with timestamp 2025-12-12 01:45
 
 ## [0.0.2] - 2025-12-11
 
@@ -72,5 +75,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.0.3]: https://github.com/juren53/csv-reader/releases/tag/v0.0.3
 [0.0.2]: https://github.com/juren53/csv-reader/releases/tag/v0.0.2
 [0.0.1]: https://github.com/juren53/csv-reader/releases/tag/v0.0.1
