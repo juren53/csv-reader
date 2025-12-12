@@ -315,9 +315,6 @@ class CSVReaderApp(QMainWindow):
         
         # Install event filter for key events at application level
         QApplication.instance().installEventFilter(self)
-        
-        # Load the last viewed file if it exists
-        self.loadLastViewedFile()
     
     def initUI(self):
         """Initialize the user interface"""
@@ -998,6 +995,15 @@ def main():
     # Create and show the main window
     window = CSVReaderApp()
     window.show()
+    
+    # Check for command line arguments (file to open)
+    if len(sys.argv) > 1:
+        file_path = sys.argv[1]
+        if os.path.exists(file_path) and file_path.lower().endswith('.csv'):
+            window.loadCSVFile(file_path)
+    else:
+        # Only load last viewed file if no command line argument
+        window.loadLastViewedFile()
     
     # Start the event loop
     sys.exit(app.exec())
