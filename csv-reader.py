@@ -18,9 +18,10 @@ import csv
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                            QHBoxLayout, QGridLayout, QLabel, QScrollArea, 
                            QFileDialog, QMessageBox, QMenu, QSizePolicy,
-                           QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView)
+                           QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
+                           QLineEdit, QPushButton)
 from PyQt6.QtCore import Qt, QSettings, QSize, QEvent
-from PyQt6.QtGui import QFont, QKeySequence, QFontMetrics, QPalette, QAction
+from PyQt6.QtGui import QFont, QKeySequence, QFontMetrics, QPalette, QAction, QColor
 
 class TableView(QTableWidget):
     """Widget to display CSV data in a spreadsheet-like table format"""
@@ -41,6 +42,7 @@ class TableView(QTableWidget):
         # Configure headers
         self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self.horizontalHeader().setStretchLastSection(True)
+        self.horizontalHeader().setDefaultAlignment(Qt.AlignmentFlag.AlignLeft)
         self.verticalHeader().setDefaultSectionSize(25)
         self.verticalHeader().setVisible(True)
         
@@ -51,6 +53,11 @@ class TableView(QTableWidget):
         
         # Enable sorting
         self.setSortingEnabled(True)
+        
+        # Search tracking
+        self.search_results = []  # List of (row, col) tuples
+        self.current_search_index = -1
+        self.search_text = ""
         
     def updateFontSize(self):
         """Update the font size based on the current zoom level"""
@@ -102,6 +109,95 @@ class TableView(QTableWidget):
         
         # Update font size
         self.updateFontSize()
+        
+        # Clear search highlights
+        self.clearSearch()
+    
+    def searchTable(self, search_text, case_sensitive=False):
+        """Search for text in the table and highlight results"""
+        # Clear previous search
+        self.clearSearch()
+        
+        if not search_text:
+            return 0
+        
+        self.search_text = search_text
+        self.search_results = []
+        
+        # Search through all cells
+        for row in range(self.rowCount()):
+            for col in range(self.columnCount()):
+                item = self.item(row, col)
+                if item:
+                    cell_text = item.text()
+                    # Check if search text is in cell
+                    if case_sensitive:
+                        if search_text in cell_text:
+                            self.search_results.append((row, col))
+                    else:
+                        if search_text.lower() in cell_text.lower():
+                            self.search_results.append((row, col))
+        
+        # Highlight all results
+        for row, col in self.search_results:
+            item = self.item(row, col)
+            if item:
+                item.setBackground(QColor(255, 255, 0, 100))  # Light yellow
+        
+        # Move to first result if any
+        if self.search_results:
+            self.current_search_index = 0
+            self.highlightCurrentResult()
+        
+        return len(self.search_results)
+    
+    def highlightCurrentResult(self):
+        """Highlight the current search result with a different color"""
+        if not self.search_results or self.current_search_index < 0:
+            return
+        
+        # Unhighlight previous result (back to light yellow)
+        for i, (row, col) in enumerate(self.search_results):
+            item = self.item(row, col)
+            if item:
+                if i == self.current_search_index:
+                    item.setBackground(QColor(255, 165, 0, 150))  # Orange for current
+                else:
+                    item.setBackground(QColor(255, 255, 0, 100))  # Light yellow for others
+        
+        # Scroll to current result
+        if self.search_results:
+            row, col = self.search_results[self.current_search_index]
+            self.scrollToItem(self.item(row, col))
+    
+    def nextSearchResult(self):
+        """Move to next search result"""
+        if not self.search_results:
+            return False
+        
+        self.current_search_index = (self.current_search_index + 1) % len(self.search_results)
+        self.highlightCurrentResult()
+        return True
+    
+    def previousSearchResult(self):
+        """Move to previous search result"""
+        if not self.search_results:
+            return False
+        
+        self.current_search_index = (self.current_search_index - 1) % len(self.search_results)
+        self.highlightCurrentResult()
+        return True
+    
+    def clearSearch(self):
+        """Clear search highlights"""
+        for row, col in self.search_results:
+            item = self.item(row, col)
+            if item:
+                item.setBackground(QColor(255, 255, 255, 0))  # Transparent
+        
+        self.search_results = []
+        self.current_search_index = -1
+        self.search_text = ""
 
 class RecordView(QScrollArea):
     """Widget to display a single CSV record vertically"""
@@ -195,7 +291,7 @@ class CSVReaderApp(QMainWindow):
     """Main application window for CSV Reader"""
     
     MAX_RECENT_FILES = 10
-    VERSION = "v0.0.1  2025-12-11  03:05"
+    VERSION = "v0.0.2  2025-12-11  18:25"
     
     def __init__(self):
         super().__init__()
@@ -209,6 +305,7 @@ class CSVReaderApp(QMainWindow):
         self.current_record_index = 0
         self.current_file_path = None
         self.current_view_mode = "record"  # "record" or "table"
+        self.search_visible = False
         
         # Set up the UI
         self.initUI()
@@ -236,7 +333,6 @@ class CSVReaderApp(QMainWindow):
         view_controls_layout = QHBoxLayout()
         
         # View mode buttons
-        from PyQt6.QtWidgets import QPushButton
         self.record_view_btn = QPushButton("Record View")
         self.record_view_btn.setCheckable(True)
         self.record_view_btn.setChecked(True)
@@ -251,7 +347,49 @@ class CSVReaderApp(QMainWindow):
         view_controls_layout.addWidget(self.table_view_btn)
         view_controls_layout.addStretch()
         
+        # Search button (only visible in table view)
+        self.search_toggle_btn = QPushButton("Search")
+        self.search_toggle_btn.setCheckable(True)
+        self.search_toggle_btn.setChecked(False)
+        self.search_toggle_btn.clicked.connect(self.toggleSearch)
+        self.search_toggle_btn.hide()  # Hidden initially
+        view_controls_layout.addWidget(self.search_toggle_btn)
+        
         main_layout.addLayout(view_controls_layout)
+        
+        # Create search bar (initially hidden)
+        self.search_widget = QWidget()
+        search_layout = QHBoxLayout(self.search_widget)
+        search_layout.setContentsMargins(0, 0, 0, 0)
+        
+        search_layout.addWidget(QLabel("Search:"))
+        
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Enter search text...")
+        self.search_input.returnPressed.connect(self.performSearch)
+        search_layout.addWidget(self.search_input)
+        
+        self.search_btn = QPushButton("Find")
+        self.search_btn.clicked.connect(self.performSearch)
+        search_layout.addWidget(self.search_btn)
+        
+        self.prev_result_btn = QPushButton("Previous")
+        self.prev_result_btn.clicked.connect(self.previousSearchResult)
+        search_layout.addWidget(self.prev_result_btn)
+        
+        self.next_result_btn = QPushButton("Next")
+        self.next_result_btn.clicked.connect(self.nextSearchResult)
+        search_layout.addWidget(self.next_result_btn)
+        
+        self.search_result_label = QLabel("")
+        search_layout.addWidget(self.search_result_label)
+        
+        self.clear_search_btn = QPushButton("Clear")
+        self.clear_search_btn.clicked.connect(self.clearTableSearch)
+        search_layout.addWidget(self.clear_search_btn)
+        
+        self.search_widget.hide()
+        main_layout.addWidget(self.search_widget)
         
         # Create views container
         self.views_container = QWidget()
@@ -325,7 +463,6 @@ class CSVReaderApp(QMainWindow):
         record_view_action = QAction('&Record View', self)
         record_view_action.setCheckable(True)
         record_view_action.setChecked(True)
-        record_view_action.setShortcut(QKeySequence('F1'))
         record_view_action.triggered.connect(self.switchToRecordView)
         view_menu.addAction(record_view_action)
         self.record_view_action = record_view_action
@@ -334,7 +471,6 @@ class CSVReaderApp(QMainWindow):
         table_view_action = QAction('&Table View', self)
         table_view_action.setCheckable(True)
         table_view_action.setChecked(False)
-        table_view_action.setShortcut(QKeySequence('F2'))
         table_view_action.triggered.connect(self.switchToTableView)
         view_menu.addAction(table_view_action)
         self.table_view_action = table_view_action
@@ -347,6 +483,23 @@ class CSVReaderApp(QMainWindow):
         toggle_view_action.setShortcut(QKeySequence('Ctrl+T'))
         toggle_view_action.triggered.connect(self.toggleView)
         view_menu.addAction(toggle_view_action)
+        
+        # Help menu
+        help_menu = menubar.addMenu('&Help')
+        
+        # Quick Reference action
+        quick_ref_action = QAction('&Quick Reference', self)
+        quick_ref_action.setShortcut(QKeySequence('F1'))
+        quick_ref_action.triggered.connect(self.showQuickReference)
+        help_menu.addAction(quick_ref_action)
+        
+        # Separator
+        help_menu.addSeparator()
+        
+        # About action
+        about_action = QAction('&About CSV Reader', self)
+        about_action.triggered.connect(self.showAbout)
+        help_menu.addAction(about_action)
         
         # Status bar
         self.statusBar().showMessage(f'Ready | {self.VERSION}')
@@ -365,6 +518,11 @@ class CSVReaderApp(QMainWindow):
         self.record_view.show()
         self.table_view.hide()
         self.nav_widget.show()
+        
+        # Hide search controls
+        self.search_toggle_btn.hide()
+        self.search_widget.hide()
+        self.search_visible = False
         
         # Update UI state
         self.record_view_btn.setChecked(True)
@@ -388,6 +546,9 @@ class CSVReaderApp(QMainWindow):
         self.record_view.hide()
         self.table_view.show()
         self.nav_widget.hide()
+        
+        # Show search button
+        self.search_toggle_btn.show()
         
         # Update UI state
         self.record_view_btn.setChecked(False)
@@ -489,6 +650,123 @@ class CSVReaderApp(QMainWindow):
         last_file = self.settings.value("lastViewedFile", "")
         if last_file and os.path.exists(last_file):
             self.loadCSVFile(last_file)
+    
+    def toggleSearch(self):
+        """Toggle search bar visibility"""
+        self.search_visible = not self.search_visible
+        if self.search_visible:
+            self.search_widget.show()
+            self.search_input.setFocus()
+        else:
+            self.search_widget.hide()
+            self.clearTableSearch()
+    
+    def performSearch(self):
+        """Perform search in table view"""
+        search_text = self.search_input.text()
+        if not search_text:
+            return
+        
+        count = self.table_view.searchTable(search_text, case_sensitive=False)
+        if count > 0:
+            self.search_result_label.setText(f"Found {count} match(es) - Showing 1/{count}")
+        else:
+            self.search_result_label.setText("No matches found")
+    
+    def nextSearchResult(self):
+        """Move to next search result"""
+        if self.table_view.nextSearchResult():
+            total = len(self.table_view.search_results)
+            current = self.table_view.current_search_index + 1
+            self.search_result_label.setText(f"Found {total} match(es) - Showing {current}/{total}")
+    
+    def previousSearchResult(self):
+        """Move to previous search result"""
+        if self.table_view.previousSearchResult():
+            total = len(self.table_view.search_results)
+            current = self.table_view.current_search_index + 1
+            self.search_result_label.setText(f"Found {total} match(es) - Showing {current}/{total}")
+    
+    def clearTableSearch(self):
+        """Clear search in table view"""
+        self.search_input.clear()
+        self.search_result_label.setText("")
+        self.table_view.clearSearch()
+    
+    def showQuickReference(self):
+        """Display quick reference dialog"""
+        quick_ref_text = """
+<h2>CSV Reader - Quick Reference</h2>
+
+<h3>View Modes</h3>
+<ul>
+<li><b>Record View</b>: Displays one CSV record at a time with fields shown vertically (header-value pairs)</li>
+<li><b>Table View</b>: Displays all CSV data in a spreadsheet-like table format</li>
+</ul>
+
+<h3>Navigation (Record View)</h3>
+<ul>
+<li><b>Left Arrow</b>: Previous record</li>
+<li><b>Right Arrow</b>: Next record</li>
+<li><b>Click Previous/Next buttons</b>: Navigate between records</li>
+</ul>
+
+<h3>Table View</h3>
+<ul>
+<li><b>Click any cell</b>: Switch to Record View for that row</li>
+<li><b>Click column headers</b>: Sort by that column</li>
+</ul>
+
+<h3>Keyboard Shortcuts</h3>
+<ul>
+<li><b>Ctrl+O</b>: Open CSV file</li>
+<li><b>Ctrl+T</b>: Toggle between Record and Table views</li>
+<li><b>Ctrl+MouseWheel</b>: Zoom in/out (40%-300%)</li>
+<li><b>F1</b>: Show Quick Reference</li>
+<li><b>Ctrl+Q</b>: Quit application</li>
+</ul>
+
+<h3>Features</h3>
+<ul>
+<li><b>Recent Files</b>: Access recently opened CSV files from File menu</li>
+<li><b>Auto-load</b>: Last viewed file opens automatically on startup</li>
+<li><b>Independent Zoom</b>: Each view mode maintains its own zoom level</li>
+<li><b>Text Selection</b>: Select and copy text in Record View</li>
+</ul>
+        """
+        
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Quick Reference")
+        msg.setTextFormat(Qt.TextFormat.RichText)
+        msg.setText(quick_ref_text)
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg.exec()
+    
+    def showAbout(self):
+        """Display about dialog"""
+        about_text = f"""
+<h2>CSV Reader</h2>
+<p><b>Version:</b> {self.VERSION}</p>
+<p>A PyQt6-based application for viewing CSV files with both record and table view modes.</p>
+<p><b>Features:</b></p>
+<ul>
+<li>Dual view modes (Record and Table)</li>
+<li>Keyboard navigation and shortcuts</li>
+<li>Zoom functionality (40%-300%)</li>
+<li>Recent files tracking</li>
+<li>Auto-load last viewed file</li>
+</ul>
+<p><b>Copyright © 2025</b></p>
+        """
+        
+        msg = QMessageBox(self)
+        msg.setWindowTitle("About CSV Reader")
+        msg.setTextFormat(Qt.TextFormat.RichText)
+        msg.setText(about_text)
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg.exec()
     
     def openRecentFile(self, file_path):
         """Open a file from the recent files menu"""
