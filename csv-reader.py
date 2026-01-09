@@ -11,6 +11,9 @@ Features:
 - Recent files menu
 - Zoom functionality with Ctrl + mouse wheel
 - Support for Excel files (.xlsx) using openpyxl
+
+Changelog:
+v0.0.5 2026-01-09 10:45 CST - Added dynamic header row selection feature
 """
 
 import sys
@@ -298,7 +301,7 @@ class CSVReaderApp(QMainWindow):
     """Main application window for CSV Reader"""
     
     MAX_RECENT_FILES = 10
-    VERSION = "v0.0.4  2026-01-08  14:30"
+    VERSION = "v0.0.5  2026-01-09  10:45 CST"
     
     def __init__(self):
         super().__init__()
@@ -728,6 +731,7 @@ class CSVReaderApp(QMainWindow):
 <ul>
 <li><b>Left Arrow</b>: Previous record</li>
 <li><b>Right Arrow</b>: Next record</li>
+<li><b>H</b>: Select current record as header row</li>
 <li><b>Click Previous/Next buttons</b>: Navigate between records</li>
 </ul>
 
@@ -752,6 +756,7 @@ class CSVReaderApp(QMainWindow):
 <li><b>Auto-load</b>: Last viewed file opens automatically on startup</li>
 <li><b>Independent Zoom</b>: Each view mode maintains its own zoom level</li>
 <li><b>Text Selection</b>: Select and copy text in Record View</li>
+<li><b>Dynamic Header Selection</b>: Choose any row as the header in Record View</li>
 </ul>
         """
         
@@ -799,12 +804,13 @@ class CSVReaderApp(QMainWindow):
 <li>Support for CSV and XLSX files</li>
 <li>Multi-sheet XLSX files (loads first sheet)</li>
 <li>Dual view modes (Record and Table)</li>
+<li>Dynamic header row selection</li>
 <li>Keyboard navigation and shortcuts</li>
 <li>Zoom functionality (40%-300%)</li>
 <li>Recent files tracking</li>
 <li>Auto-load last viewed file</li>
 </ul>
-<p><b>Copyright © 2025</b></p>
+<p><b>Copyright © 2026</b></p>
         """
         
         msg = QMessageBox(self)
@@ -981,11 +987,136 @@ class CSVReaderApp(QMainWindow):
         """Go to the next record"""
         if not self.csv_data:
             return
-            
+
         if self.current_record_index < len(self.csv_data) - 1:
             self.current_record_index += 1
             self.displayCurrentRecord()
-    
+
+    def selectCurrentRecordAsHeader(self):
+        """Allow user to select current record as the new header row"""
+        if not self.csv_data or not self.headers:
+            return
+
+        # Don't allow if only one row (would leave no data)
+        if len(self.csv_data) <= 1:
+            QMessageBox.warning(
+                self,
+                "Cannot Change Header",
+                "Cannot set header when only one data row exists.",
+                QMessageBox.StandardButton.Ok
+            )
+            return
+
+        current_record = self.csv_data[self.current_record_index]
+
+        # Show confirmation dialog
+        if self.showHeaderSelectionDialog(current_record, self.current_record_index):
+            self.reassignHeaderRow(self.current_record_index)
+
+    def showHeaderSelectionDialog(self, record_data, record_index):
+        """Show dialog to confirm header selection with horizontal display"""
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout, QTableWidget, \
+                                     QTableWidgetItem, QDialogButtonBox, QLabel
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Select Header Row")
+        dialog.setMinimumWidth(600)
+
+        layout = QVBoxLayout()
+
+        # Add explanation label
+        info_label = QLabel(
+            f"Select record {record_index + 1} as the new header row?\n\n"
+            "The current header will become a data row.\n"
+            "All rows before this will remain as data."
+        )
+        info_label.setWordWrap(True)
+        layout.addWidget(info_label)
+
+        # Create table to show current headers and selected row
+        preview_table = QTableWidget(2, len(self.headers))
+        preview_table.setHorizontalHeaderLabels([f"Col {i+1}" for i in range(len(self.headers))])
+        preview_table.setVerticalHeaderLabels(["Current Header", "New Header"])
+
+        # Populate table
+        for col_idx, header in enumerate(self.headers):
+            preview_table.setItem(0, col_idx, QTableWidgetItem(str(header)))
+
+        for col_idx, value in enumerate(record_data):
+            if col_idx < len(self.headers):
+                preview_table.setItem(1, col_idx, QTableWidgetItem(str(value)))
+
+        preview_table.resizeColumnsToContents()
+        preview_table.setMaximumHeight(150)
+        layout.addWidget(preview_table)
+
+        # Add buttons
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Yes | QDialogButtonBox.StandardButton.No
+        )
+        button_box.accepted.connect(dialog.accept)
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        dialog.setLayout(layout)
+
+        # Show dialog and return result
+        return dialog.exec() == QDialog.DialogCode.Accepted
+
+    def reassignHeaderRow(self, new_header_index):
+        """Reassign the header row to a different row in the data"""
+        if new_header_index < 0 or new_header_index >= len(self.csv_data):
+            return
+
+        # Get the new header row
+        new_header_row = self.csv_data[new_header_index]
+
+        # Pad new header if needed to match maximum row length
+        max_cols = max(len(row) for row in self.csv_data)
+        if len(new_header_row) < max_cols:
+            new_header_row = list(new_header_row) + \
+                            [f"Column{i+1}" for i in range(len(new_header_row), max_cols)]
+        else:
+            new_header_row = list(new_header_row)
+
+        # Build new data structure
+        new_data = []
+
+        # 1. Add old header as first data row
+        new_data.append(self.headers)
+
+        # 2. Add all rows before the selected row
+        new_data.extend(self.csv_data[0:new_header_index])
+
+        # 3. Add all rows after the selected row (skip the selected row itself)
+        new_data.extend(self.csv_data[new_header_index + 1:])
+
+        # Normalize all rows to have same length as headers
+        for i in range(len(new_data)):
+            if len(new_data[i]) < len(new_header_row):
+                new_data[i] = list(new_data[i]) + [''] * (len(new_header_row) - len(new_data[i]))
+
+        # Update application state
+        self.headers = new_header_row
+        self.csv_data = new_data
+
+        # Adjust current record index if needed
+        if self.current_record_index >= len(self.csv_data):
+            self.current_record_index = len(self.csv_data) - 1
+        if self.current_record_index < 0:
+            self.current_record_index = 0
+
+        # Update both views
+        if self.current_view_mode == "record":
+            self.displayCurrentRecord()
+        else:
+            self.table_view.displayData(self.headers, self.csv_data)
+            self.switchToRecordView()  # Switch back to record view after change
+
+        # Update UI
+        self.updateStatusBar()
+        self.statusBar().showMessage("Header row updated", 3000)
+
     def keyPressEvent(self, event):
         """Handle key press events for navigation"""
         if not self.csv_data:
@@ -1014,6 +1145,9 @@ class CSVReaderApp(QMainWindow):
                     return True
                 elif event.key() == Qt.Key.Key_Right:
                     self.nextRecord()
+                    return True
+                elif event.key() == Qt.Key.Key_H:
+                    self.selectCurrentRecordAsHeader()
                     return True
         elif event.type() == QEvent.Type.Wheel:
             # Handle wheel events with Ctrl for zooming

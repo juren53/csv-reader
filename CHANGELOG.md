@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.0.5] - 2026-01-09
+
+### Added
+- **Dynamic Header Selection**: Users can now select any row as the header in Record View
+  - Press 'H' key in Record View to select current record as header
+  - Preview dialog shows current header vs. new header in horizontal table format
+  - Confirmation required before applying change
+  - Original header becomes first data row
+  - All rows before selected row remain as data rows
+  - Selected row becomes new header and is removed from data
+  - Headers automatically reset to first row when file is reopened
+  - Single-row protection: prevents operation when only one data row exists
+  - Handles column count mismatches with automatic padding
+
+### Changed
+- Updated Quick Reference to include 'H' key shortcut and Dynamic Header Selection feature
+- Version bumped to v0.0.5 2026-01-09 10:45 CST
+
 ## [0.0.4] - 2026-01-08
 
 ### Added
@@ -108,6 +126,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.0.5]: https://github.com/juren53/csv-reader/releases/tag/v0.0.5
 [0.0.4]: https://github.com/juren53/csv-reader/releases/tag/v0.0.4
 [0.0.3]: https://github.com/juren53/csv-reader/releases/tag/v0.0.3
 [0.0.2]: https://github.com/juren53/csv-reader/releases/tag/v0.0.2
