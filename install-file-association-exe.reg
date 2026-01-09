@@ -1,0 +1,31 @@
+Windows Registry Editor Version 5.00
+
+; CSV Reader File Association Registry File for Executable
+; This file sets up Windows to open CSV files with CSV Reader executable
+; 
+; To install: Double-click this file and confirm the registry changes
+; To uninstall: Use "Default apps" in Windows Settings or edit registry manually
+
+[HKEY_CLASSES_ROOT\.csv]
+@="CSVReader.csv"
+"PerceivedType"="text"
+
+[HKEY_CLASSES_ROOT\CSVReader.csv]
+@="CSV File"
+"EditFlags"=dword:00000000
+"BrowserFlags"=dword:00000008
+
+[HKEY_CLASSES_ROOT\CSVReader.csv\DefaultIcon]
+@="C:\\Users\\jimur\\Projects\\csv-reader\\dist\\CSV Reader.exe,0"
+
+[HKEY_CLASSES_ROOT\CSVReader.csv\shell]
+
+[HKEY_CLASSES_ROOT\CSVReader.csv\shell\open]
+
+[HKEY_CLASSES_ROOT\CSVReader.csv\shell\open\command]
+@="\"C:\\Users\\jimur\\Projects\\csv-reader\\dist\\CSV Reader.exe\" \"%1\""
+
+[HKEY_CLASSES_ROOT\CSVReader.csv\shell\edit]
+
+[HKEY_CLASSES_ROOT\CSVReader.csv\shell\edit\command]
+@="\"C:\\Users\\jimur\\Projects\\csv-reader\\dist\\CSV Reader.exe\" \"%1\""
