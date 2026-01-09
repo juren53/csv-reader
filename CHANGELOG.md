@@ -11,6 +11,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - **Changelog Menu Item**: New "Changelog" option in Help menu that displays CHANGELOG.md content
 - **Icons Directory**: Added three PNG icon files (ICON_csv-reader.png, ICON_csv-reader-1.png, ICON_csv-reader-2.png)
 - **Desktop File**: csv-reader.desktop for system menu integration
+- **Windows 11 Compatibility Guide**: WINDOWS-11-COMPATIBILITY.md with comprehensive Windows deployment documentation
+
+### Fixed
+- **Desktop File Integration**: Fixed csv-reader.desktop to properly handle CSV files from file manager
+  - Changed %U to %F for better local file handling
+  - Corrected argument order (script path before %F)
+  - Now properly opens CSV files when selected from file manager right-click menu
 
 ## [0.0.3] - 2025-12-12
 
