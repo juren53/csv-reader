@@ -4,17 +4,24 @@
 """
 CSV Reader Application
 
-A PyQt6-based application to view CSV files with data displayed vertically.
+A PyQt6-based application to view CSV and XLSX files with data displayed vertically.
 Features:
-- Display CSV records vertically with header as labels
+- Display CSV/XLSX records vertically with header as labels
 - Navigate records using left/right arrow keys
 - Recent files menu
 - Zoom functionality with Ctrl + mouse wheel
+- Support for Excel files (.xlsx) using openpyxl
 """
 
 import sys
 import os
 import csv
+try:
+    import openpyxl
+    XLSX_SUPPORT_AVAILABLE = True
+except ImportError:
+    XLSX_SUPPORT_AVAILABLE = False
+    openpyxl = None
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                            QHBoxLayout, QGridLayout, QLabel, QScrollArea, 
                            QFileDialog, QMessageBox, QMenu, QSizePolicy,
@@ -291,7 +298,7 @@ class CSVReaderApp(QMainWindow):
     """Main application window for CSV Reader"""
     
     MAX_RECENT_FILES = 10
-    VERSION = "v0.0.3  2025-12-12  01:45"
+    VERSION = "v0.0.4  2026-01-08  14:30"
     
     def __init__(self):
         super().__init__()
@@ -319,7 +326,7 @@ class CSVReaderApp(QMainWindow):
     def initUI(self):
         """Initialize the user interface"""
         # Set window properties
-        self.setWindowTitle("CSV Reader")
+        self.setWindowTitle("CSV/XLSX Reader")
         self.setMinimumSize(800, 600)
         
         # Set application icon
@@ -653,10 +660,10 @@ class CSVReaderApp(QMainWindow):
         self.updateRecentFilesMenu()
     
     def loadLastViewedFile(self):
-        """Load the last viewed CSV file on startup"""
+        """Load the last viewed data file on startup"""
         last_file = self.settings.value("lastViewedFile", "")
         if last_file and os.path.exists(last_file):
-            self.loadCSVFile(last_file)
+            self.loadDataFile(last_file)
     
     def toggleSearch(self):
         """Toggle search bar visibility"""
@@ -703,12 +710,18 @@ class CSVReaderApp(QMainWindow):
     def showQuickReference(self):
         """Display quick reference dialog"""
         quick_ref_text = """
-<h2>CSV Reader - Quick Reference</h2>
+<h2>CSV/XLSX Reader - Quick Reference</h2>
+
+<h3>Supported File Formats</h3>
+<ul>
+<li><b>CSV Files</b>: Standard comma-separated values files (.csv)</li>
+<li><b>Excel Files</b>: Excel workbook files (.xlsx) - first sheet only</li>
+</ul>
 
 <h3>View Modes</h3>
 <ul>
-<li><b>Record View</b>: Displays one CSV record at a time with fields shown vertically (header-value pairs)</li>
-<li><b>Table View</b>: Displays all CSV data in a spreadsheet-like table format</li>
+<li><b>Record View</b>: Displays one data record at a time with fields shown vertically (header-value pairs)</li>
+<li><b>Table View</b>: Displays all data in a spreadsheet-like table format</li>
 </ul>
 
 <h3>Navigation (Record View)</h3>
@@ -778,11 +791,13 @@ class CSVReaderApp(QMainWindow):
     def showAbout(self):
         """Display about dialog"""
         about_text = f"""
-<h2>CSV Reader</h2>
+<h2>CSV/XLSX Reader</h2>
 <p><b>Version:</b> {self.VERSION}</p>
-<p>A PyQt6-based application for viewing CSV files with both record and table view modes.</p>
+<p>A PyQt6-based application for viewing CSV and XLSX files with both record and table view modes.</p>
 <p><b>Features:</b></p>
 <ul>
+<li>Support for CSV and XLSX files</li>
+<li>Multi-sheet XLSX files (loads first sheet)</li>
 <li>Dual view modes (Record and Table)</li>
 <li>Keyboard navigation and shortcuts</li>
 <li>Zoom functionality (40%-300%)</li>
@@ -793,7 +808,7 @@ class CSVReaderApp(QMainWindow):
         """
         
         msg = QMessageBox(self)
-        msg.setWindowTitle("About CSV Reader")
+        msg.setWindowTitle("About CSV/XLSX Reader")
         msg.setTextFormat(Qt.TextFormat.RichText)
         msg.setText(about_text)
         msg.setIcon(QMessageBox.Icon.Information)
@@ -803,7 +818,7 @@ class CSVReaderApp(QMainWindow):
     def openRecentFile(self, file_path):
         """Open a file from the recent files menu"""
         if os.path.exists(file_path):
-            self.loadCSVFile(file_path)
+            self.loadDataFile(file_path)
         else:
             QMessageBox.warning(self, "File Not Found", 
                                f"The file {file_path} does not exist.",
@@ -817,61 +832,115 @@ class CSVReaderApp(QMainWindow):
                 self.updateRecentFilesMenu()
     
     def openFile(self):
-        """Open a file dialog to select a CSV file"""
+        """Open a file dialog to select a CSV or XLSX file"""
         file_path, _ = QFileDialog.getOpenFileName(
-            self, "Open CSV File", "", "CSV Files (*.csv);;All Files (*)"
+            self, "Open Data File", "",
+            "CSV Files (*.csv);;Excel Files (*.xlsx);;All Files (*)"
         )
-        
+
         if file_path:
-            self.loadCSVFile(file_path)
-    
-    def loadCSVFile(self, file_path):
-        """Load and parse a CSV file"""
+            self.loadDataFile(file_path)
+
+    def _loadCSVData(self, file_path):
+        """Parse CSV file and populate headers and csv_data"""
+        with open(file_path, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            self.csv_data = list(reader)
+
+        if not self.csv_data:
+            raise Exception("File is empty")
+
+        # Extract headers (first row)
+        self.headers = self.csv_data[0]
+
+        # Remove headers from data
+        self.csv_data = self.csv_data[1:]
+
+        if not self.csv_data:
+            raise Exception("No data records found")
+
+    def _loadXLSXData(self, file_path):
+        """Parse XLSX file and populate headers and csv_data"""
+        if not XLSX_SUPPORT_AVAILABLE:
+            raise Exception(
+                "XLSX support requires the 'openpyxl' library.\n\n"
+                "Install it using: pip install openpyxl"
+            )
+
         try:
-            with open(file_path, 'r', newline='', encoding='utf-8') as f:
-                # Use csv module to handle quotes and special characters
-                reader = csv.reader(f)
-                self.csv_data = list(reader)
-            
-            if not self.csv_data:
-                raise Exception("File is empty")
-                
-            # Extract headers (first row)
-            self.headers = self.csv_data[0]
-            
-            # Remove headers from data
-            self.csv_data = self.csv_data[1:]
-            
-            if not self.csv_data:
-                raise Exception("No data records found")
-                
+            workbook = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+        except Exception as e:
+            raise Exception(f"Failed to open XLSX file: {str(e)}")
+
+        if len(workbook.sheetnames) == 0:
+            raise Exception("XLSX file contains no sheets")
+
+        sheet = workbook[workbook.sheetnames[0]]
+
+        # Convert sheet to list of lists
+        data = []
+        for row in sheet.iter_rows(values_only=True):
+            row_data = [str(cell) if cell is not None else '' for cell in row]
+            data.append(row_data)
+
+        workbook.close()
+
+        if not data:
+            raise Exception("First sheet is empty")
+
+        # Extract headers (first row)
+        self.headers = data[0]
+
+        # Remove headers from data
+        self.csv_data = data[1:]
+
+        if not self.csv_data:
+            raise Exception("No data records found (only headers present)")
+
+    def loadDataFile(self, file_path):
+        """Load and parse a CSV or XLSX file"""
+        try:
+            # Detect file type
+            file_ext = os.path.splitext(file_path)[1].lower()
+
+            if file_ext == '.xlsx':
+                self._loadXLSXData(file_path)
+            elif file_ext == '.csv':
+                self._loadCSVData(file_path)
+            else:
+                raise Exception(f"Unsupported file type: {file_ext}")
+
             # Reset current record index
             self.current_record_index = 0
-            
+
             # Update UI
             self.current_file_path = file_path
-            self.setWindowTitle(f"CSV Reader - {file_path}")
-            
+            self.setWindowTitle(f"CSV/XLSX Reader - {file_path}")
+
             # Display data based on current view mode
             if self.current_view_mode == "record":
                 self.displayCurrentRecord()
             else:
                 self.table_view.displayData(self.headers, self.csv_data)
-            
+
             # Add to recent files
             self.addToRecentFiles(file_path)
-            
+
             # Save as last viewed file
             self.settings.setValue("lastViewedFile", file_path)
-            
+
             # Update status
             self.updateStatusBar()
-            
+
         except Exception as e:
-            QMessageBox.critical(self, "Error", 
-                               f"Failed to load CSV file: {str(e)}",
+            QMessageBox.critical(self, "Error",
+                               f"Failed to load file: {str(e)}",
                                QMessageBox.StandardButton.Ok)
             self.statusBar().showMessage("Failed to load file")
+
+    def loadCSVFile(self, file_path):
+        """Load and parse a CSV file (deprecated - use loadDataFile)"""
+        self.loadDataFile(file_path)
     
     def displayCurrentRecord(self):
         """Display the current record or table based on view mode"""
@@ -999,8 +1068,12 @@ def main():
     # Check for command line arguments (file to open)
     if len(sys.argv) > 1:
         file_path = sys.argv[1]
-        if os.path.exists(file_path) and file_path.lower().endswith('.csv'):
-            window.loadCSVFile(file_path)
+        if os.path.exists(file_path):
+            file_ext = file_path.lower()
+            if file_ext.endswith('.csv') or file_ext.endswith('.xlsx'):
+                window.loadDataFile(file_path)
+            else:
+                print(f"Error: Unsupported file type. Please provide a .csv or .xlsx file.")
     else:
         # Only load last viewed file if no command line argument
         window.loadLastViewedFile()

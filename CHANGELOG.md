@@ -6,11 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.0.4] - 2026-01-08
+
 ### Added
+- **XLSX File Support**: Application now supports Excel .xlsx files
+  - Uses openpyxl library for parsing Excel files
+  - Loads first sheet only from multi-sheet workbooks
+  - Maintains same data structure and UI behavior as CSV files
+  - Graceful error handling when openpyxl not installed
+- Updated file dialogs to accept both .csv and .xlsx files
+- Command-line argument support extended to .xlsx files
+- XLSX files tracked in recent files alongside CSV files
 - **Application Icon**: Set window icon using icons/ICON_csv-reader.png
 - **Changelog Menu Item**: New "Changelog" option in Help menu that displays CHANGELOG.md content
 - **Icons Directory**: Added three PNG icon files (ICON_csv-reader.png, ICON_csv-reader-1.png, ICON_csv-reader-2.png)
 - **Desktop File**: csv-reader.desktop for system menu integration
+- **requirements.txt**: Added dependency file listing PyQt6 and openpyxl
+
+### Changed
+- Window title updated from "CSV Reader" to "CSV/XLSX Reader"
+- File dialogs now show "Open Data File" instead of "Open CSV File"
+- Error messages now say "Failed to load file" instead of "Failed to load CSV file"
+- Quick Reference and About dialogs updated to reflect multi-format support
+
+### Dependencies
+- openpyxl: Required for .xlsx file support (install: pip install openpyxl)
 
 ## [0.0.3] - 2025-12-12
 
@@ -81,6 +101,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.0.4]: https://github.com/juren53/csv-reader/releases/tag/v0.0.4
 [0.0.3]: https://github.com/juren53/csv-reader/releases/tag/v0.0.3
 [0.0.2]: https://github.com/juren53/csv-reader/releases/tag/v0.0.2
 [0.0.1]: https://github.com/juren53/csv-reader/releases/tag/v0.0.1
