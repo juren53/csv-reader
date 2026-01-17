@@ -13,6 +13,7 @@ Features:
 - Support for Excel files (.xlsx) using openpyxl
 
 Changelog:
+v0.1.0 2026-01-17 14:30 CST - Added scroll position lock and scrollable Quick Reference
 v0.0.5 2026-01-09 10:45 CST - Added dynamic header row selection feature
 """
 
@@ -263,13 +264,17 @@ class RecordView(QScrollArea):
         
     def displayRecord(self, headers, record):
         """Display a record with headers as labels"""
+        # Save current scroll position to preserve it across record changes
+        scrollbar = self.verticalScrollBar()
+        saved_scroll_position = scrollbar.value()
+
         # Clear previous content
         while self.grid_layout.count():
             item = self.grid_layout.takeAt(0)
             widget = item.widget()
             if widget:
                 widget.deleteLater()
-                
+
         if not headers or not record:
             return
             
@@ -293,15 +298,19 @@ class RecordView(QScrollArea):
         # Set column stretch
         self.grid_layout.setColumnStretch(0, 0)  # Header column
         self.grid_layout.setColumnStretch(1, 1)  # Value column
-        
+
         # Update font size
         self.updateFontSize()
+
+        # Restore scroll position after layout updates complete
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(0, lambda: scrollbar.setValue(saved_scroll_position))
 
 class CSVReaderApp(QMainWindow):
     """Main application window for CSV Reader"""
     
     MAX_RECENT_FILES = 10
-    VERSION = "v0.0.5  2026-01-09  10:45 CST"
+    VERSION = "v0.1.0  2026-01-17  14:30 CST"
     
     def __init__(self):
         super().__init__()
@@ -756,18 +765,30 @@ class CSVReaderApp(QMainWindow):
 <li><b>Auto-load</b>: Last viewed file opens automatically on startup</li>
 <li><b>Independent Zoom</b>: Each view mode maintains its own zoom level</li>
 <li><b>Text Selection</b>: Select and copy text in Record View</li>
-<li><b>Dynamic Header Selection</b>: Choose any row as the header in Record View</li>
+<li><b>Dynamic Header Selection</b>: Press H to set current record as new header row</li>
+<li><b>Scroll Position Lock</b>: Scroll position is preserved when navigating between records for easy field comparison</li>
 </ul>
         """
-        
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Quick Reference")
-        msg.setTextFormat(Qt.TextFormat.RichText)
-        msg.setText(quick_ref_text)
-        msg.setIcon(QMessageBox.Icon.Information)
-        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg.exec()
-    
+
+        from PyQt6.QtWidgets import QDialog, QTextBrowser, QDialogButtonBox
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Quick Reference")
+        dialog.setMinimumSize(600, 500)
+
+        layout = QVBoxLayout(dialog)
+
+        text_browser = QTextBrowser()
+        text_browser.setHtml(quick_ref_text)
+        text_browser.setOpenExternalLinks(True)
+        layout.addWidget(text_browser)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+        button_box.accepted.connect(dialog.accept)
+        layout.addWidget(button_box)
+
+        dialog.exec()
+
     def showChangelog(self):
         """Display changelog dialog"""
         changelog_path = os.path.join(os.path.dirname(__file__), "CHANGELOG.md")

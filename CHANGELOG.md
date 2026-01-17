@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-01-17 14:30 CST
+
+### Added
+- **Scroll Position Lock**: Scroll position is now preserved when navigating between records in Record View
+  - Enables easy comparison of the same fields across different records
+  - Position automatically maintained when using arrow keys or navigation buttons
+- **Windows Executable**: Compiled standalone EXE file for Windows deployment
+  - Built with PyInstaller using --onefile and --windowed options
+  - Embedded application icon (ICON_csv-reader.ico)
+  - Includes all dependencies (PyQt6, openpyxl, etc.)
+  - No Python installation required on target system
+  - File size: ~58MB
+  - Download available at: https://drive.google.com/file/d/10FXUc7KbMLFsl2dUwSSt81OxmMuI1ibC/view?usp=sharing
+
+### Changed
+- **Quick Reference Dialog**: Now uses scrollable dialog instead of message box
+  - Content is fully accessible regardless of window size
+  - Uses QTextBrowser for improved HTML rendering
+- Updated Quick Reference to document Scroll Position Lock and Dynamic Header Selection features
+
 ## [0.0.5] - 2026-01-09
 
 ### Added
@@ -126,6 +146,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.1.0]: https://github.com/juren53/csv-reader/releases/tag/v0.1.0
 [0.0.5]: https://github.com/juren53/csv-reader/releases/tag/v0.0.5
 [0.0.4]: https://github.com/juren53/csv-reader/releases/tag/v0.0.4
 [0.0.3]: https://github.com/juren53/csv-reader/releases/tag/v0.0.3
