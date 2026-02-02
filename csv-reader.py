@@ -13,6 +13,7 @@ Features:
 - Support for Excel files (.xlsx) using openpyxl
 
 Changelog:
+v0.1.1 2026-02-01 18:42 CST - Integrated Icon Manager Module for cross-platform icon support
 v0.1.0 2026-01-17 14:30 CST - Added scroll position lock and scrollable Quick Reference
 v0.0.5 2026-01-09 10:45 CST - Added dynamic header row selection feature
 """
@@ -33,6 +34,8 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QLineEdit, QPushButton)
 from PyQt6.QtCore import Qt, QSettings, QSize, QEvent
 from PyQt6.QtGui import QFont, QKeySequence, QFontMetrics, QPalette, QAction, QColor, QIcon
+
+from icon_loader import icons
 
 class TableView(QTableWidget):
     """Widget to display CSV data in a spreadsheet-like table format"""
@@ -310,7 +313,7 @@ class CSVReaderApp(QMainWindow):
     """Main application window for CSV Reader"""
     
     MAX_RECENT_FILES = 10
-    VERSION = "v0.1.0  2026-01-17  14:30 CST"
+    VERSION = "v0.1.1  2026-02-01  18:42 CST"
     
     def __init__(self):
         super().__init__()
@@ -341,10 +344,8 @@ class CSVReaderApp(QMainWindow):
         self.setWindowTitle("CSV/XLSX Reader")
         self.setMinimumSize(800, 600)
         
-        # Set application icon
-        icon_path = os.path.join(os.path.dirname(__file__), "icons", "ICON_csv-reader.png")
-        if os.path.exists(icon_path):
-            self.setWindowIcon(QIcon(icon_path))
+        # Set window icon
+        self.setWindowIcon(icons.app_icon())
         
         # Create central widget and layout
         central_widget = QWidget()
@@ -1216,9 +1217,15 @@ def main():
     app.setApplicationName("CSVReader")
     app.setOrganizationName("CSVReader")
     
+    # Set application icon
+    app.setWindowIcon(icons.app_icon())
+    
     # Create and show the main window
     window = CSVReaderApp()
     window.show()
+    
+    # Fix Windows taskbar icon (no-op on other platforms)
+    icons.set_taskbar_icon(window)
     
     # Check for command line arguments (file to open)
     if len(sys.argv) > 1:

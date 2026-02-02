@@ -6,6 +6,26 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-02-01 18:42 CST
+
+### Added
+- **Icon Manager Module Integration**: Cross-platform icon management for consistent icon display
+  - Integrated icon_loader.py module from Icon_Manager_Module
+  - Generated platform-specific icons: app.ico (Windows), app.icns (macOS), multi-resolution PNGs (Linux)
+  - Automatic OS-specific icon format selection
+  - Windows taskbar icon fix via AppUserModelID + WM_SETICON
+  - Graceful fallback chain: native format → sized PNGs → null icon with warnings
+  - 4 lines of code changes across 1 file (csv-reader.py)
+- Generated cross-platform icon assets from ICON_csv-reader-2.png source
+  - app.ico (135 KB) - Multi-resolution Windows icon with 7 embedded sizes
+  - app.icns (1.2 KB) - macOS dock icon
+  - app.png (35.3 KB) - Linux default icon (256x256)
+  - Individual resolution PNGs: 16x16, 24x24, 32x32, 48x48, 64x64, 128x128, 256x256
+
+### Changed
+- Updated csv-reader.desktop Icon path from ICON_csv-reader.png to app.png
+- Icon loading now uses Icon Manager Module instead of direct QIcon(path)
+
 ## [0.1.0] - 2026-01-17 14:30 CST
 
 ### Added
@@ -146,6 +166,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.1.1]: https://github.com/juren53/csv-reader/releases/tag/v0.1.1
 [0.1.0]: https://github.com/juren53/csv-reader/releases/tag/v0.1.0
 [0.0.5]: https://github.com/juren53/csv-reader/releases/tag/v0.0.5
 [0.0.4]: https://github.com/juren53/csv-reader/releases/tag/v0.0.4
