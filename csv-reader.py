@@ -773,6 +773,7 @@ class CSVReaderApp(QMainWindow):
 <h3>Keyboard Shortcuts</h3>
 <ul>
 <li><b>Ctrl+O</b>: Open CSV file</li>
+<li><b>Ctrl+F</b>: Search (switches to Table View if needed)</li>
 <li><b>Ctrl+T</b>: Toggle between Record and Table views</li>
 <li><b>Ctrl+MouseWheel</b>: Zoom in/out (40%-300%)</li>
 <li><b>F1</b>: Show Quick Reference</li>
