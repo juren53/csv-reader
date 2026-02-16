@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-02-16 16:39 CST
+
+### Added
+- **Edit Menu**: New Edit pull-down menu between File and View menus
+  - Search... (Ctrl+F): Activates search functionality from any view mode
+  - Automatically switches to Table View if in Record View
+  - Focuses search input and selects existing text for quick replacement
+
 ## [0.1.1] - 2026-02-01 18:42 CST
 
 ### Added
@@ -166,6 +174,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.1.2]: https://github.com/juren53/csv-reader/releases/tag/v0.1.2
 [0.1.1]: https://github.com/juren53/csv-reader/releases/tag/v0.1.1
 [0.1.0]: https://github.com/juren53/csv-reader/releases/tag/v0.1.0
 [0.0.5]: https://github.com/juren53/csv-reader/releases/tag/v0.0.5

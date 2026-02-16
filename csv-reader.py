@@ -13,6 +13,7 @@ Features:
 - Support for Excel files (.xlsx) using openpyxl
 
 Changelog:
+v0.1.2 2026-02-16 16:39 CST - Added Edit menu with Search (Ctrl+F) shortcut
 v0.1.1 2026-02-01 18:42 CST - Integrated Icon Manager Module for cross-platform icon support
 v0.1.0 2026-01-17 14:30 CST - Added scroll position lock and scrollable Quick Reference
 v0.0.5 2026-01-09 10:45 CST - Added dynamic header row selection feature
@@ -313,7 +314,7 @@ class CSVReaderApp(QMainWindow):
     """Main application window for CSV Reader"""
     
     MAX_RECENT_FILES = 10
-    VERSION = "v0.1.1  2026-02-01  18:42 CST"
+    VERSION = "v0.1.2  2026-02-16  16:39 CST"
     
     def __init__(self):
         super().__init__()
@@ -478,6 +479,15 @@ class CSVReaderApp(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
+        # Edit menu
+        edit_menu = menubar.addMenu('&Edit')
+
+        # Search action
+        search_action = QAction('&Search...', self)
+        search_action.setShortcut(QKeySequence('Ctrl+F'))
+        search_action.triggered.connect(self.activateSearch)
+        edit_menu.addAction(search_action)
+
         # View menu
         view_menu = menubar.addMenu('&View')
         
@@ -678,6 +688,15 @@ class CSVReaderApp(QMainWindow):
         if last_file and os.path.exists(last_file):
             self.loadDataFile(last_file)
     
+    def activateSearch(self):
+        """Activate search - switch to table view if needed and show search bar"""
+        if self.current_view_mode == "record":
+            self.switchToTableView()
+        if not self.search_visible:
+            self.toggleSearch()
+        self.search_input.setFocus()
+        self.search_input.selectAll()
+
     def toggleSearch(self):
         """Toggle search bar visibility"""
         self.search_visible = not self.search_visible
