@@ -1,0 +1,6 @@
+py -3.12 -m venv venv
+  .\venv\Scripts\Activate.ps1
+  pip install -r requirements.txt
+  pip install pyinstaller
+  python csv-reader.py        # to run
+  pyinstaller csv-reader.py   # to build
