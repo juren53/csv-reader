@@ -9,7 +9,12 @@ This guide helps you install CSV Reader on Windows 11 for desktop integration.
 2. Copy `CSV Reader.exe` to your desired location (e.g., `C:\Program Files\CSV Reader\`)
 3. Double-click `CSV Reader.exe` to launch the application
 
-### Option 2: Using the Batch File
+### Option 2: Using PowerShell (run.ps1)
+1. Open PowerShell in the project directory
+2. Run `.\run.ps1` — auto-creates a venv, installs dependencies, and launches the app
+3. If blocked by execution policy, run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` once first
+
+### Option 3: Using the Batch File
 1. Ensure you have Python installed with PyQt6
 2. Double-click `csv-reader.bat` to launch the application
 
