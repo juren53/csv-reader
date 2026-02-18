@@ -41,6 +41,13 @@ from PyQt6.QtGui import QFont, QKeySequence, QFontMetrics, QPalette, QAction, QC
 
 from icon_loader import icons
 
+try:
+    from pyqt_app_info import AppIdentity, gather_info
+    from pyqt_app_info.qt import AboutDialog as _AboutDialog
+    PYQT_APP_INFO_AVAILABLE = True
+except ImportError:
+    PYQT_APP_INFO_AVAILABLE = False
+
 class TableView(QTableWidget):
     """Widget to display CSV data in a spreadsheet-like table format"""
     
@@ -840,7 +847,26 @@ class CSVReaderApp(QMainWindow):
     
     def showAbout(self):
         """Display about dialog"""
-        about_text = f"""
+        if PYQT_APP_INFO_AVAILABLE:
+            identity = AppIdentity(
+                name="CSV/XLSX Reader",
+                version=self.VERSION,
+                description="A PyQt6-based application for viewing CSV and XLSX files with both record and table view modes.",
+                features=[
+                    "Support for CSV and XLSX files",
+                    "Multi-sheet XLSX files (loads first sheet)",
+                    "Dual view modes (Record and Table)",
+                    "Dynamic header row selection",
+                    "Keyboard navigation and shortcuts",
+                    "Zoom functionality (40%–300%)",
+                    "Recent files tracking",
+                    "Auto-load last viewed file",
+                ],
+            )
+            info = gather_info(identity, caller_file=__file__)
+            _AboutDialog(info, parent=self).exec()
+        else:
+            about_text = f"""
 <h2>CSV/XLSX Reader</h2>
 <p><b>Version:</b> {self.VERSION}</p>
 <p>A PyQt6-based application for viewing CSV and XLSX files with both record and table view modes.</p>
@@ -856,15 +882,14 @@ class CSVReaderApp(QMainWindow):
 <li>Auto-load last viewed file</li>
 </ul>
 <p><b>Copyright © 2026</b></p>
-        """
-        
-        msg = QMessageBox(self)
-        msg.setWindowTitle("About CSV/XLSX Reader")
-        msg.setTextFormat(Qt.TextFormat.RichText)
-        msg.setText(about_text)
-        msg.setIcon(QMessageBox.Icon.Information)
-        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg.exec()
+            """
+            msg = QMessageBox(self)
+            msg.setWindowTitle("About CSV/XLSX Reader")
+            msg.setTextFormat(Qt.TextFormat.RichText)
+            msg.setText(about_text)
+            msg.setIcon(QMessageBox.Icon.Information)
+            msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+            msg.exec()
     
     def openRecentFile(self, file_path):
         """Open a file from the recent files menu"""
