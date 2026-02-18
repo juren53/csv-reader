@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-02-18 09:44 CST
+
+### Changed
+- **Help/About dialog**: Replaced hand-rolled `QMessageBox` with `AboutDialog` from [pyqt-app-info](https://github.com/juren53/pyqt-app-info)
+  - Now displays execution mode (Python source vs compiled executable), code location, Python executable path, and OS platform
+  - Resizable dialog with selectable text in the technical details section
+  - Graceful fallback to original dialog if `pyqt-app-info` is not installed
+- **`requirements.txt`**: Added `pyqt-app-info` dependency (installed from GitHub)
+
 ## [0.1.5] - 2026-02-18 CST
 
 ### Changed
@@ -214,6 +223,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.1.6]: https://github.com/juren53/csv-reader/releases/tag/v0.1.6
 [0.1.5]: https://github.com/juren53/csv-reader/releases/tag/v0.1.5
 [0.1.4]: https://github.com/juren53/csv-reader/releases/tag/v0.1.4
 [0.1.3]: https://github.com/juren53/csv-reader/releases/tag/v0.1.3

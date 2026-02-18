@@ -13,6 +13,7 @@ Features:
 - Support for Excel files (.xlsx) using openpyxl
 
 Changelog:
+v0.1.6 2026-02-18 09:44 CST - Integrated pyqt-app-info into Help/About dialog
 v0.1.5 2026-02-18 09:27 CST - Synced run.ps1/run.sh from Python-venv generic template
 v0.1.4 2026-02-17 CST - Added broken venv detection (Test-VenvValid) to run.ps1
 v0.1.3 2026-02-17 CST - Added smart Python discovery (Find-Python) to run.ps1
@@ -324,7 +325,7 @@ class CSVReaderApp(QMainWindow):
     """Main application window for CSV Reader"""
     
     MAX_RECENT_FILES = 10
-    VERSION = "v0.1.5  2026-02-18  09:27 CST"
+    VERSION = "v0.1.6  2026-02-18  09:44 CST"
     
     def __init__(self):
         super().__init__()
