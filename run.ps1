@@ -1,14 +1,18 @@
-# CSVreader launcher — creates/activates venv and installs dependencies if needed
+# Python venv launcher — generic template
+# Drop this script into any Python project, edit the CONFIGURATION block, and run.
 
 $ErrorActionPreference = "Stop"
+
+# --- CONFIGURATION ---
+$AppName     = "CSVreader"         # Display name shown in status messages
+$EntryPoint  = "csv-reader.py"     # Main Python script to run
+$VenvDir     = "venv"              # Virtual environment directory name
+$Requirements = "requirements.txt" # Pip requirements file
+# --- END CONFIGURATION ---
 
 # Resolve project directory (where this script lives)
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $ScriptDir
-
-$VenvDir = "venv"
-$Requirements = "requirements.txt"
-$EntryPoint = "csv-reader.py"
 
 # Check if an existing venv's base Python is still present.
 # Reads pyvenv.cfg directly — never runs the (potentially broken) venv Python.
@@ -69,19 +73,19 @@ function Find-Python {
 
 # Wipe venv if it exists but points to a missing Python
 if ((Test-Path $VenvDir) -and -not (Test-VenvValid $VenvDir)) {
-    Write-Host "Existing venv has a broken Python reference, recreating..."
+    Write-Host "[$AppName] Existing venv has a broken Python reference, recreating..."
     Remove-Item $VenvDir -Recurse -Force
 }
 
 # Create venv if it doesn't exist
 if (-not (Test-Path $VenvDir)) {
-    Write-Host "Creating virtual environment..."
+    Write-Host "[$AppName] Creating virtual environment..."
     $pythonExe = Find-Python
     if (-not $pythonExe) {
         Write-Error "Error: no working Python found. Install Python from https://python.org"
         exit 1
     }
-    Write-Host "Using Python: $pythonExe"
+    Write-Host "[$AppName] Using Python: $pythonExe"
     & $pythonExe -m venv $VenvDir
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Error: Failed to create venv."
@@ -108,7 +112,7 @@ if (-not (Test-Path $Marker)) {
 }
 
 if ($installDeps) {
-    Write-Host "Installing dependencies..."
+    Write-Host "[$AppName] Installing dependencies..."
     pip install --upgrade pip -q
     pip install -r $Requirements -q
     New-Item -ItemType File -Path $Marker -Force | Out-Null
