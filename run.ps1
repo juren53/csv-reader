@@ -10,6 +10,18 @@ $VenvDir = "venv"
 $Requirements = "requirements.txt"
 $EntryPoint = "csv-reader.py"
 
+# Check if an existing venv's base Python is still present.
+# Reads pyvenv.cfg directly — never runs the (potentially broken) venv Python.
+function Test-VenvValid {
+    param([string]$VenvPath)
+    $cfg = Join-Path $VenvPath "pyvenv.cfg"
+    if (-not (Test-Path $cfg)) { return $false }
+    $homeLine = Get-Content $cfg | Where-Object { $_ -match "^home\s*=" }
+    if (-not $homeLine) { return $false }
+    $pythonHome = ($homeLine -split "=", 2)[1].Trim()
+    return (Test-Path (Join-Path $pythonHome "python.exe"))
+}
+
 # Find a working system Python, bypassing any currently activated (possibly broken) venv.
 # Priority: py launcher > common install paths > PATH python
 function Find-Python {
@@ -53,6 +65,12 @@ function Find-Python {
     }
 
     return $null
+}
+
+# Wipe venv if it exists but points to a missing Python
+if ((Test-Path $VenvDir) -and -not (Test-VenvValid $VenvDir)) {
+    Write-Host "Existing venv has a broken Python reference, recreating..."
+    Remove-Item $VenvDir -Recurse -Force
 }
 
 # Create venv if it doesn't exist
