@@ -13,6 +13,9 @@ Features:
 - Support for Excel files (.xlsx) using openpyxl
 
 Changelog:
+v0.1.5 2026-02-18 09:27 CST - Synced run.ps1/run.sh from Python-venv generic template
+v0.1.4 2026-02-17 CST - Added broken venv detection (Test-VenvValid) to run.ps1
+v0.1.3 2026-02-17 CST - Added smart Python discovery (Find-Python) to run.ps1
 v0.1.2 2026-02-16 16:39 CST - Added Edit menu with Search (Ctrl+F) shortcut
 v0.1.1 2026-02-01 18:42 CST - Integrated Icon Manager Module for cross-platform icon support
 v0.1.0 2026-01-17 14:30 CST - Added scroll position lock and scrollable Quick Reference
@@ -314,7 +317,7 @@ class CSVReaderApp(QMainWindow):
     """Main application window for CSV Reader"""
     
     MAX_RECENT_FILES = 10
-    VERSION = "v0.1.2  2026-02-16  16:39 CST"
+    VERSION = "v0.1.5  2026-02-18  09:27 CST"
     
     def __init__(self):
         super().__init__()

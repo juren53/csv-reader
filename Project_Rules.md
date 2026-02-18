@@ -22,7 +22,19 @@ Example formats:
 
 - Format: `v0.0.X` for releases
 - Format: `v0.0.Xa`, `v0.0.Xb`, `v0.0.Xc` for point releases/patches
-- Update version info in the README.md file, UI label, the About dialog and header comment when making releases  Note:  Version info consists of the Version Number, the Date  AND THE TIME!!!  e.g.  v0.2.6  2025-12-22 1125  and time should always be CST/CDT
+- Version info consists of: Version Number + Date + Time (CST/CDT). Example: `v0.1.5  2026-02-18  09:27 CST`
+
+### Files that MUST be updated on every release
+
+| File | What to update |
+|------|---------------|
+| `csv-reader.py` | Header changelog block (add new entry) + `VERSION = "..."` constant |
+| `README.md` | `**Version:**` line near top |
+| `CHANGELOG.md` | New version section + tag link at bottom |
+| `WINDOWS-11-COMPATIBILITY.md` | `**Version:**` and `**Last Updated:**` footer |
+| `WINDOWS-INSTALLATION-GUIDE.md` | `**Version:**` and `**Last Updated:**` footer |
+
+After updating files: commit, tag (`git tag vX.X.X`), push tag, create GitHub release.
 
 
 
