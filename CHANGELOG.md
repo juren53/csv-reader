@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-02-17 CST
+
+### Fixed
+- **`run.ps1`**: Detect and recreate broken venv before activation
+  - Added `Test-VenvValid` helper that reads `pyvenv.cfg` to check whether the venv's base Python path still exists — without running any broken executable
+  - If the venv points to a missing Python (e.g. created under a different user account), it is automatically wiped and recreated
+  - Prevents the `No Python at '...'` error that occurred when activating a stale venv
+
 ## [0.1.3] - 2026-02-17 CST
 
 ### Fixed
@@ -188,6 +196,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.1.4]: https://github.com/juren53/csv-reader/releases/tag/v0.1.4
 [0.1.3]: https://github.com/juren53/csv-reader/releases/tag/v0.1.3
 [0.1.2]: https://github.com/juren53/csv-reader/releases/tag/v0.1.2
 [0.1.1]: https://github.com/juren53/csv-reader/releases/tag/v0.1.1
