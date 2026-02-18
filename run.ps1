@@ -10,15 +10,61 @@ $VenvDir = "venv"
 $Requirements = "requirements.txt"
 $EntryPoint = "csv-reader.py"
 
+# Find a working system Python, bypassing any currently activated (possibly broken) venv.
+# Priority: py launcher > common install paths > PATH python
+function Find-Python {
+    # 1. py launcher — Windows-level tool, not affected by venv activation
+    $py = Get-Command py -ErrorAction SilentlyContinue
+    if ($py) {
+        try {
+            $null = & py --version 2>&1
+            if ($LASTEXITCODE -eq 0) { return "py" }
+        } catch {}
+    }
+
+    # 2. Common installation directories (avoids PATH pollution from activated venv)
+    $searchPatterns = @(
+        "$env:LOCALAPPDATA\Programs\Python\Python3*\python.exe",
+        "$env:LOCALAPPDATA\Programs\Python\Python*\python.exe",
+        "C:\Python3*\python.exe",
+        "C:\Python*\python.exe"
+    )
+    foreach ($pattern in $searchPatterns) {
+        $candidate = Get-Item $pattern -ErrorAction SilentlyContinue |
+                     Sort-Object Name -Descending |
+                     Select-Object -First 1
+        if ($candidate) {
+            try {
+                $null = & $candidate.FullName --version 2>&1
+                if ($LASTEXITCODE -eq 0) { return $candidate.FullName }
+            } catch {}
+        }
+    }
+
+    # 3. PATH python — last resort; may be the broken venv python if one is active
+    foreach ($cmd in @("python", "python3")) {
+        $found = Get-Command $cmd -ErrorAction SilentlyContinue
+        if ($found) {
+            try {
+                $null = & $found.Source --version 2>&1
+                if ($LASTEXITCODE -eq 0) { return $found.Source }
+            } catch {}
+        }
+    }
+
+    return $null
+}
+
 # Create venv if it doesn't exist
 if (-not (Test-Path $VenvDir)) {
     Write-Host "Creating virtual environment..."
-    $pythonCmd = Get-Command python -ErrorAction SilentlyContinue
-    if (-not $pythonCmd) {
-        Write-Error "Error: python not found. Install Python from https://python.org"
+    $pythonExe = Find-Python
+    if (-not $pythonExe) {
+        Write-Error "Error: no working Python found. Install Python from https://python.org"
         exit 1
     }
-    python -m venv $VenvDir
+    Write-Host "Using Python: $pythonExe"
+    & $pythonExe -m venv $VenvDir
     if ($LASTEXITCODE -ne 0) {
         Write-Error "Error: Failed to create venv."
         exit 1
