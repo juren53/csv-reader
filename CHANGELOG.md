@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Graceful fallback to original dialog if `pyqt-app-info` is not installed
 - **`requirements.txt`**: Added `pyqt-app-info` dependency (installed from GitHub)
 
+### Build
+- **Windows executable**: Compiled with PyInstaller 6.19.0 / Python 3.12.10
+  - File: `csv-reader.exe` (~36 MB, one-file, windowed, icon embedded)
+  - Download attached to this release
+
 ## [0.1.5] - 2026-02-18 CST
 
 ### Changed
