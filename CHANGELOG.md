@@ -6,6 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-02-18 CST
+
+### Changed
+- **`run.ps1`**: Synced from Python-venv generic template
+  - Added `# --- CONFIGURATION ---` block (`$AppName`, `$EntryPoint`, `$VenvDir`, `$Requirements`)
+  - Status messages now include `[CSVreader]` prefix
+- **`run.sh`**: Full rewrite to match `run.ps1` feature parity
+  - Added `# --- CONFIGURATION ---` block
+  - Added `test_venv_valid()` — reads `pyvenv.cfg` to check base Python still exists without invoking the venv
+  - Added `find_python()` — tries `python3`, `python`, then common fixed paths (`/usr/bin/python3`, `/usr/local/bin/python3`, `~/.pyenv/shims/python3`)
+  - Added broken venv detection: wipes and recreates venv if base Python is missing
+  - Status messages now include `[CSVreader]` prefix
+
 ## [0.1.4] - 2026-02-17 CST
 
 ### Fixed
@@ -196,6 +209,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.1.5]: https://github.com/juren53/csv-reader/releases/tag/v0.1.5
 [0.1.4]: https://github.com/juren53/csv-reader/releases/tag/v0.1.4
 [0.1.3]: https://github.com/juren53/csv-reader/releases/tag/v0.1.3
 [0.1.2]: https://github.com/juren53/csv-reader/releases/tag/v0.1.2
