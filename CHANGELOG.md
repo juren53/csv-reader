@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-02-17 CST
+
+### Fixed
+- **`run.ps1`**: Robust Python detection when a stale or broken venv is activated
+  - Added `Find-Python` helper that probes candidates in order: `py` launcher, common install paths, PATH python
+  - Each candidate is verified by running `--version` before use, skipping shims that point to missing interpreters
+  - Prevents failure caused by a venv created under a different user account or a moved Python installation
+
 ## [0.1.2] - 2026-02-16 16:39 CST
 
 ### Added
