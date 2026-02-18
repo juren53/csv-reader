@@ -18,6 +18,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Added `find_python()` — tries `python3`, `python`, then common fixed paths (`/usr/bin/python3`, `/usr/local/bin/python3`, `~/.pyenv/shims/python3`)
   - Added broken venv detection: wipes and recreates venv if base Python is missing
   - Status messages now include `[CSVreader]` prefix
+- **`csv-reader.py`**: Updated `VERSION` constant to `v0.1.5 2026-02-18 09:27 CST`; added v0.1.3/0.1.4/0.1.5 entries to header changelog
+- **`README.md`**: Version line updated to v0.1.5
+- **`WINDOWS-11-COMPATIBILITY.md`**: Version and Last Updated footer updated
+- **`WINDOWS-INSTALLATION-GUIDE.md`**: Version and Last Updated footer updated
+- **`Project_Rules.md`**: Added explicit table of all files requiring version updates on each release
 
 ## [0.1.4] - 2026-02-17 CST
 
