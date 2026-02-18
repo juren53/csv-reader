@@ -13,6 +13,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Search... (Ctrl+F): Activates search functionality from any view mode
   - Automatically switches to Table View if in Record View
   - Focuses search input and selects existing text for quick replacement
+- **`run.ps1`**: Windows PowerShell launcher — auto-creates venv, installs dependencies, and launches csv-reader
+- Complements the existing `run.sh` for Linux/macOS/Git Bash users
+- **`README.md`**: New project README with features, quick start for all platforms, keyboard shortcuts, and project structure
+
+### Documentation
+- `WINDOWS-INSTALLATION-GUIDE.md` updated to document `run.ps1` as an installation option
 
 ## [0.1.1] - 2026-02-01 18:42 CST
 
