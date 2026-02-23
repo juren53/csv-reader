@@ -26,3 +26,7 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
+WINDOWS-INSTALLATION.md
+create-desktop-shortcut.bat
+fix-file-association-admin.bat
+fix-file-association.bat
