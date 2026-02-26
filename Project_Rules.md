@@ -38,4 +38,4 @@ After updating files: commit, tag (`git tag vX.X.X`), push tag, create GitHub re
 
 ## Compiling Instructions
 
-- compile PathManager to make a single executable EXE file using icons\ICON_PathMgr.png as the application icon
+- compile csv-reader to make a single executable EXE file CSV-Reader.spec
