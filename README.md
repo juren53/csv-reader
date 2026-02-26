@@ -1,5 +1,8 @@
 # CSV Reader
 
+This is and update.  More edits.
+This is and update.  More edits.
+
 **Version:** v0.1.6 (2026-02-18)
 
 A PyQt6-based application for viewing CSV and XLSX files with dual view modes — record-by-record or spreadsheet table.
