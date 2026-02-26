@@ -36,8 +36,6 @@ Example formats:
 
 After updating files: commit, tag (`git tag vX.X.X`), push tag, create GitHub release.
 
-
-
 ## Compiling Instructions
 
 - compile PathManager to make a single executable EXE file using icons\ICON_PathMgr.png as the application icon
