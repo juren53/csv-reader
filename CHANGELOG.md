@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-05-26 CST
+
+### Added
+- **Data Edit Feature**: Full in-place editing of CSV and XLSX data
+  - **Table View**: Double-click any cell to edit it inline; Enter confirms, Escape cancels
+  - **Record View**: New **Edit** button toggles edit mode — all value labels become text inputs; **Done Editing** commits changes to memory
+  - Navigation (arrow keys, Prev/Next buttons) in Record View auto-saves the current record before moving
+  - Switching from Record View to Table View auto-commits any open edits
+- **Save / Save As**
+  - `File > Save` (Ctrl+S) — writes changes back to the original file (CSV or XLSX)
+  - `File > Save As...` (Ctrl+Shift+S) — saves to a new file path
+- **Unsaved-changes tracking**
+  - Title bar shows `*` indicator when there are unsaved in-memory changes
+  - Opening a new file or closing the application prompts to Save / Don't Save / Cancel
+
 ## [0.1.6] - 2026-02-18 09:44 CST
 
 ### Changed
@@ -228,6 +243,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.1.7]: https://github.com/juren53/csv-reader/releases/tag/v0.1.7
 [0.1.6]: https://github.com/juren53/csv-reader/releases/tag/v0.1.6
 [0.1.5]: https://github.com/juren53/csv-reader/releases/tag/v0.1.5
 [0.1.4]: https://github.com/juren53/csv-reader/releases/tag/v0.1.4
