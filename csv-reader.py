@@ -1405,7 +1405,8 @@ class CSVReaderApp(QMainWindow):
         """Global event filter to capture key events regardless of focus"""
         if event.type() == QEvent.Type.KeyPress:
             # Handle left/right arrow keys for navigation in record view only
-            if self.current_view_mode == "record":
+            # Skip when in edit mode so keystrokes reach the QLineEdit fields
+            if self.current_view_mode == "record" and not self.record_edit_mode:
                 if event.key() == Qt.Key.Key_Left:
                     self.previousRecord()
                     return True
