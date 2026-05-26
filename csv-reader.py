@@ -13,6 +13,7 @@ Features:
 - Support for Excel files (.xlsx) using openpyxl
 
 Changelog:
+v0.1.7 2026-05-26 CST - Added data edit feature: inline table editing, record edit mode, Save/Save As
 v0.1.6 2026-02-18 09:44 CST - Integrated pyqt-app-info into Help/About dialog
 v0.1.5 2026-02-18 09:27 CST - Synced run.ps1/run.sh from Python-venv generic template
 v0.1.4 2026-02-17 CST - Added broken venv detection (Test-VenvValid) to run.ps1
@@ -37,7 +38,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QFileDialog, QMessageBox, QMenu, QSizePolicy,
                            QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
                            QLineEdit, QPushButton)
-from PyQt6.QtCore import Qt, QSettings, QSize, QEvent
+from PyQt6.QtCore import Qt, QSettings, QSize, QEvent, pyqtSignal
 from PyQt6.QtGui import QFont, QKeySequence, QFontMetrics, QPalette, QAction, QColor, QIcon
 
 from icon_loader import icons
@@ -51,12 +52,17 @@ except ImportError:
 
 class TableView(QTableWidget):
     """Widget to display CSV data in a spreadsheet-like table format"""
-    
+
+    cellEdited = pyqtSignal(int, int, str)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         
         # Configure table properties
-        self.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)  # Read-only
+        self.setEditTriggers(
+            QAbstractItemView.EditTrigger.DoubleClicked |
+            QAbstractItemView.EditTrigger.EditKeyPressed
+        )
         self.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectItems)
         self.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.setWordWrap(True)
@@ -84,6 +90,9 @@ class TableView(QTableWidget):
         self.search_results = []  # List of (row, col) tuples
         self.current_search_index = -1
         self.search_text = ""
+
+        self._loading = False
+        self.itemChanged.connect(self._onItemChanged)
         
     def updateFontSize(self):
         """Update the font size based on the current zoom level"""
@@ -108,36 +117,40 @@ class TableView(QTableWidget):
         
     def displayData(self, headers, data):
         """Display CSV data in the table"""
-        if not headers or not data:
-            self.clear()
-            return
-            
-        # Set table dimensions
-        self.setRowCount(len(data))
-        self.setColumnCount(len(headers))
-        
-        # Set headers
-        self.setHorizontalHeaderLabels(headers)
-        
-        # Populate table with data
-        for row_idx, row_data in enumerate(data):
-            # Ensure row has enough columns
-            if len(row_data) < len(headers):
-                row_data = row_data + [''] * (len(headers) - len(row_data))
-                
-            for col_idx, cell_value in enumerate(row_data):
-                item = QTableWidgetItem(str(cell_value))
-                item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-                self.setItem(row_idx, col_idx, item)
-        
-        # Resize columns to content
-        self.resizeColumnsToContents()
-        
-        # Update font size
-        self.updateFontSize()
-        
-        # Clear search highlights
-        self.clearSearch()
+        self._loading = True
+        try:
+            if not headers or not data:
+                self.clear()
+                return
+
+            # Set table dimensions
+            self.setRowCount(len(data))
+            self.setColumnCount(len(headers))
+
+            # Set headers
+            self.setHorizontalHeaderLabels(headers)
+
+            # Populate table with data
+            for row_idx, row_data in enumerate(data):
+                # Ensure row has enough columns
+                if len(row_data) < len(headers):
+                    row_data = row_data + [''] * (len(headers) - len(row_data))
+
+                for col_idx, cell_value in enumerate(row_data):
+                    item = QTableWidgetItem(str(cell_value))
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+                    self.setItem(row_idx, col_idx, item)
+
+            # Resize columns to content
+            self.resizeColumnsToContents()
+
+            # Update font size
+            self.updateFontSize()
+
+            # Clear search highlights
+            self.clearSearch()
+        finally:
+            self._loading = False
     
     def searchTable(self, search_text, case_sensitive=False):
         """Search for text in the table and highlight results"""
@@ -220,10 +233,14 @@ class TableView(QTableWidget):
             item = self.item(row, col)
             if item:
                 item.setBackground(QColor(255, 255, 255, 0))  # Transparent
-        
+
         self.search_results = []
         self.current_search_index = -1
         self.search_text = ""
+
+    def _onItemChanged(self, item):
+        if not self._loading:
+            self.cellEdited.emit(item.row(), item.column(), item.text())
 
 class RecordView(QScrollArea):
     """Widget to display a single CSV record vertically"""
@@ -246,6 +263,9 @@ class RecordView(QScrollArea):
         
         # Styling
         self.label_style = "font-weight: bold; padding-right: 10px;"
+
+        self.edit_mode = False
+        self.field_editors = []
 
     def updateFontSize(self):
         """Update the font size based on the current zoom level"""
@@ -278,54 +298,55 @@ class RecordView(QScrollArea):
         return False
         
     def displayRecord(self, headers, record):
-        """Display a record with headers as labels"""
-        # Save current scroll position to preserve it across record changes
+        """Display a record with headers as labels (or editors in edit mode)"""
         scrollbar = self.verticalScrollBar()
         saved_scroll_position = scrollbar.value()
 
-        # Clear previous content
         while self.grid_layout.count():
             item = self.grid_layout.takeAt(0)
             widget = item.widget()
             if widget:
                 widget.deleteLater()
 
+        self.field_editors = []
+
         if not headers or not record:
             return
-            
-        # Display each field with its header
+
         for row, (header, value) in enumerate(zip(headers, record)):
-            # Create label for header
             header_label = QLabel(header)
             header_label.setStyleSheet(self.label_style)
             header_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignTop)
-            
-            # Create label for value
-            value_label = QLabel(value)
-            value_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
-            value_label.setWordWrap(True)
-            value_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-            
-            # Add to layout
-            self.grid_layout.addWidget(header_label, row, 0)
-            self.grid_layout.addWidget(value_label, row, 1)
-            
-        # Set column stretch
-        self.grid_layout.setColumnStretch(0, 0)  # Header column
-        self.grid_layout.setColumnStretch(1, 1)  # Value column
 
-        # Update font size
+            if self.edit_mode:
+                value_widget = QLineEdit(str(value))
+                self.field_editors.append(value_widget)
+            else:
+                value_widget = QLabel(str(value))
+                value_widget.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+                value_widget.setWordWrap(True)
+                value_widget.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+
+            self.grid_layout.addWidget(header_label, row, 0)
+            self.grid_layout.addWidget(value_widget, row, 1)
+
+        self.grid_layout.setColumnStretch(0, 0)
+        self.grid_layout.setColumnStretch(1, 1)
+
         self.updateFontSize()
 
-        # Restore scroll position after layout updates complete
         from PyQt6.QtCore import QTimer
         QTimer.singleShot(0, lambda: scrollbar.setValue(saved_scroll_position))
+
+    def getEditedValues(self):
+        """Return current values from edit-mode field editors"""
+        return [editor.text() for editor in self.field_editors]
 
 class CSVReaderApp(QMainWindow):
     """Main application window for CSV Reader"""
     
     MAX_RECENT_FILES = 10
-    VERSION = "v0.1.6  2026-02-18  09:44 CST"
+    VERSION = "v0.1.7  2026-05-26  CST"
     
     def __init__(self):
         super().__init__()
@@ -340,6 +361,8 @@ class CSVReaderApp(QMainWindow):
         self.current_file_path = None
         self.current_view_mode = "record"  # "record" or "table"
         self.search_visible = False
+        self.is_modified = False
+        self.record_edit_mode = False
         
         # Set up the UI
         self.initUI()
@@ -435,6 +458,7 @@ class CSVReaderApp(QMainWindow):
         
         # Connect table row click to record view
         self.table_view.cellClicked.connect(self.onTableCellClicked)
+        self.table_view.cellEdited.connect(self._onTableCellEdited)
         
         # Initially show only record view
         self.views_layout.addWidget(self.record_view)
@@ -461,6 +485,11 @@ class CSVReaderApp(QMainWindow):
         nav_layout.addWidget(self.nav_label)
         
         nav_layout.addWidget(next_btn_widget)
+
+        self.edit_record_btn = QPushButton("Edit")
+        self.edit_record_btn.clicked.connect(self._toggleRecordEditMode)
+        nav_layout.addWidget(self.edit_record_btn)
+
         main_layout.addWidget(self.nav_widget)
         
         self.setCentralWidget(central_widget)
@@ -480,10 +509,25 @@ class CSVReaderApp(QMainWindow):
         # Recent files submenu
         self.recent_files_menu = QMenu('&Recent Files', self)
         file_menu.addMenu(self.recent_files_menu)
-        
+
         # Separator
         file_menu.addSeparator()
-        
+
+        # Save action
+        save_action = QAction('&Save', self)
+        save_action.setShortcut(QKeySequence.StandardKey.Save)
+        save_action.triggered.connect(self.saveFile)
+        file_menu.addAction(save_action)
+
+        # Save As action
+        save_as_action = QAction('Save &As...', self)
+        save_as_action.setShortcut(QKeySequence('Ctrl+Shift+S'))
+        save_as_action.triggered.connect(self.saveFileAs)
+        file_menu.addAction(save_as_action)
+
+        # Separator
+        file_menu.addSeparator()
+
         # Exit action
         exit_action = QAction('E&xit', self)
         exit_action.setShortcut(QKeySequence.StandardKey.Quit)
@@ -561,12 +605,13 @@ class CSVReaderApp(QMainWindow):
         """Switch to record view mode"""
         if self.current_view_mode == "record":
             return
-            
+
         self.current_view_mode = "record"
         self.record_view.show()
         self.table_view.hide()
         self.nav_widget.show()
-        
+        self.edit_record_btn.show()
+
         # Hide search controls
         self.search_toggle_btn.hide()
         self.search_widget.hide()
@@ -589,12 +634,16 @@ class CSVReaderApp(QMainWindow):
         """Switch to table view mode"""
         if self.current_view_mode == "table":
             return
-            
+
+        if self.record_edit_mode:
+            self._commitRecordEdits(refresh=False)
+
         self.current_view_mode = "table"
         self.record_view.hide()
         self.table_view.show()
         self.nav_widget.hide()
-        
+        self.edit_record_btn.hide()
+
         # Show search button
         self.search_toggle_btn.show()
         
@@ -779,11 +828,23 @@ class CSVReaderApp(QMainWindow):
 <ul>
 <li><b>Click any cell</b>: Switch to Record View for that row</li>
 <li><b>Click column headers</b>: Sort by that column</li>
+<li><b>Double-click a cell</b>: Edit cell value inline; press Enter to confirm, Escape to cancel</li>
+</ul>
+
+<h3>Editing Data</h3>
+<ul>
+<li><b>Table View</b>: Double-click any cell to edit it in place</li>
+<li><b>Record View</b>: Click the <b>Edit</b> button to enter edit mode; all fields become text inputs. Click <b>Done Editing</b> to save changes to memory. Navigation (arrow keys or buttons) auto-saves the current record before moving.</li>
+<li><b>Ctrl+S</b>: Save changes back to the original file</li>
+<li><b>Ctrl+Shift+S</b>: Save As — write to a new file</li>
+<li>Unsaved changes are indicated by <b>*</b> in the title bar. You will be prompted to save when opening a new file or closing the application.</li>
 </ul>
 
 <h3>Keyboard Shortcuts</h3>
 <ul>
-<li><b>Ctrl+O</b>: Open CSV file</li>
+<li><b>Ctrl+O</b>: Open CSV/XLSX file</li>
+<li><b>Ctrl+S</b>: Save file</li>
+<li><b>Ctrl+Shift+S</b>: Save As</li>
 <li><b>Ctrl+F</b>: Search (switches to Table View if needed)</li>
 <li><b>Ctrl+T</b>: Toggle between Record and Table views</li>
 <li><b>Ctrl+MouseWheel</b>: Zoom in/out (40%-300%)</li>
@@ -976,6 +1037,17 @@ class CSVReaderApp(QMainWindow):
 
     def loadDataFile(self, file_path):
         """Load and parse a CSV or XLSX file"""
+        if self.is_modified:
+            reply = QMessageBox.question(
+                self, "Unsaved Changes",
+                "You have unsaved changes. Save before opening a new file?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.saveFile()
+            elif reply == QMessageBox.StandardButton.Cancel:
+                return
+
         try:
             # Detect file type
             file_ext = os.path.splitext(file_path)[1].lower()
@@ -1005,6 +1077,12 @@ class CSVReaderApp(QMainWindow):
 
             # Save as last viewed file
             self.settings.setValue("lastViewedFile", file_path)
+
+            # Reset modified / edit state
+            self.is_modified = False
+            self.record_edit_mode = False
+            self.edit_record_btn.setText("Edit")
+            self.record_view.edit_mode = False
 
             # Update status
             self.updateStatusBar()
@@ -1049,15 +1127,21 @@ class CSVReaderApp(QMainWindow):
         """Go to the previous record"""
         if not self.csv_data:
             return
-            
+
+        if self.record_edit_mode:
+            self._commitRecordEdits(refresh=False)
+
         if self.current_record_index > 0:
             self.current_record_index -= 1
             self.displayCurrentRecord()
-    
+
     def nextRecord(self):
         """Go to the next record"""
         if not self.csv_data:
             return
+
+        if self.record_edit_mode:
+            self._commitRecordEdits(refresh=False)
 
         if self.current_record_index < len(self.csv_data) - 1:
             self.current_record_index += 1
@@ -1187,6 +1271,117 @@ class CSVReaderApp(QMainWindow):
         # Update UI
         self.updateStatusBar()
         self.statusBar().showMessage("Header row updated", 3000)
+
+    def _markModified(self):
+        if not self.is_modified:
+            self.is_modified = True
+            title = self.windowTitle()
+            if not title.endswith(' *'):
+                self.setWindowTitle(title + ' *')
+
+    def _markSaved(self):
+        self.is_modified = False
+        title = self.windowTitle()
+        if title.endswith(' *'):
+            self.setWindowTitle(title[:-2])
+
+    def closeEvent(self, event):
+        if self.is_modified:
+            reply = QMessageBox.question(
+                self, "Unsaved Changes",
+                "You have unsaved changes. Save before closing?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No | QMessageBox.StandardButton.Cancel
+            )
+            if reply == QMessageBox.StandardButton.Yes:
+                self.saveFile()
+                event.accept()
+            elif reply == QMessageBox.StandardButton.No:
+                event.accept()
+            else:
+                event.ignore()
+        else:
+            event.accept()
+
+    def _onTableCellEdited(self, row, col, value):
+        if 0 <= row < len(self.csv_data):
+            row_data = list(self.csv_data[row])
+            while len(row_data) <= col:
+                row_data.append('')
+            row_data[col] = value
+            self.csv_data[row] = row_data
+            self._markModified()
+
+    def _commitRecordEdits(self, refresh=True):
+        if not self.record_edit_mode:
+            return
+        edited_values = self.record_view.getEditedValues()
+        if edited_values:
+            if len(edited_values) < len(self.headers):
+                edited_values.extend([''] * (len(self.headers) - len(edited_values)))
+            self.csv_data[self.current_record_index] = edited_values
+            self._markModified()
+        self.record_edit_mode = False
+        self.edit_record_btn.setText("Edit")
+        self.record_view.edit_mode = False
+        if refresh:
+            self.displayCurrentRecord()
+
+    def _toggleRecordEditMode(self):
+        if not self.csv_data or self.current_view_mode != "record":
+            return
+        if not self.record_edit_mode:
+            self.record_edit_mode = True
+            self.edit_record_btn.setText("Done Editing")
+            self.record_view.edit_mode = True
+            self.displayCurrentRecord()
+        else:
+            self._commitRecordEdits()
+
+    def saveFile(self):
+        if not self.csv_data:
+            return
+        if not self.current_file_path:
+            self.saveFileAs()
+            return
+        try:
+            ext = os.path.splitext(self.current_file_path)[1].lower()
+            if ext == '.xlsx':
+                self._saveXLSX(self.current_file_path)
+            else:
+                self._saveCSV(self.current_file_path)
+            self._markSaved()
+            self.statusBar().showMessage("File saved", 3000)
+        except Exception as e:
+            QMessageBox.critical(self, "Save Error", f"Failed to save file: {str(e)}")
+
+    def saveFileAs(self):
+        if not self.csv_data:
+            return
+        file_path, _ = QFileDialog.getSaveFileName(
+            self, "Save File As",
+            self.current_file_path or "",
+            "CSV Files (*.csv);;Excel Files (*.xlsx);;All Files (*)"
+        )
+        if file_path:
+            self.current_file_path = file_path
+            self.setWindowTitle(f"CSV/XLSX Reader - {file_path}")
+            self.saveFile()
+
+    def _saveCSV(self, file_path):
+        with open(file_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow(self.headers)
+            writer.writerows(self.csv_data)
+
+    def _saveXLSX(self, file_path):
+        if not XLSX_SUPPORT_AVAILABLE:
+            raise Exception("XLSX support requires the 'openpyxl' library.")
+        workbook = openpyxl.Workbook()
+        sheet = workbook.active
+        sheet.append(self.headers)
+        for row in self.csv_data:
+            sheet.append(row)
+        workbook.save(file_path)
 
     def keyPressEvent(self, event):
         """Handle key press events for navigation"""
