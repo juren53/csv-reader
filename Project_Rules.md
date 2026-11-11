@@ -29,12 +29,20 @@ Example formats:
 | File | What to update |
 |------|---------------|
 | `csv-reader.py` | Header changelog block (add new entry) + `VERSION = "..."` constant |
-| `README.md` | `**Version:**` line near top |
+| `README.md` | `**Version:**` line near top + `**Latest release:**` link/summary under "Windows Executable" |
 | `CHANGELOG.md` | New version section + tag link at bottom |
 | `WINDOWS-11-COMPATIBILITY.md` | `**Version:**` and `**Last Updated:**` footer |
 | `WINDOWS-INSTALLATION-GUIDE.md` | `**Version:**` and `**Last Updated:**` footer |
 
 After updating files: commit, tag (`git tag vX.X.X`), push tag, create GitHub release.
+
+### Publishing the EXE
+
+Every GitHub release MUST have the compiled `csv-reader.exe` attached as an asset (exactly that filename). The README's direct-download link points to `releases/latest/download/csv-reader.exe`, which 404s if the latest release lacks the asset. `release.bat` builds and attaches it automatically; if a release is created by hand, upload it with:
+
+```
+gh release upload vX.X.X dist\csv-reader.exe
+```
 
 ## Compiling Instructions
 

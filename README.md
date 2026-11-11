@@ -53,7 +53,15 @@ python csv-reader.py
 ```
 
 ### Windows Executable
-A standalone `.exe` (no Python required) is available — see `WINDOWS-INSTALLATION-GUIDE.md` for details.
+A standalone Windows 11 executable (no Python required) is available at:
+
+https://github.com/juren53/csv-reader/releases
+
+**Direct download (always the newest build):** [csv-reader.exe](https://github.com/juren53/csv-reader/releases/latest/download/csv-reader.exe)
+
+**Latest release:** [v0.1.7](https://github.com/juren53/csv-reader/releases/tag/v0.1.7) — Data editing (inline cell edits, Record View edit mode), Save / Save As, unsaved-changes tracking
+
+See `WINDOWS-INSTALLATION-GUIDE.md` for installation and file-association details.
 
 ## Usage
 
