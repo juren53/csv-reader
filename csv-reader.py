@@ -883,30 +883,49 @@ class CSVReaderApp(QMainWindow):
 
         dialog.exec()
 
+    CHANGELOG_URL = "https://github.com/juren53/csv-reader/blob/main/CHANGELOG.md"
+
     def showChangelog(self):
-        """Display changelog dialog"""
-        changelog_path = os.path.join(os.path.dirname(__file__), "CHANGELOG.md")
-        changelog_text = ""
-        
-        try:
-            if os.path.exists(changelog_path):
+        """Show CHANGELOG.md locally, falling back to the GitHub URL"""
+        # Source tree: next to this script. Frozen EXE: next to the executable.
+        candidates = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "CHANGELOG.md")]
+        if getattr(sys, 'frozen', False):
+            candidates.append(os.path.join(os.path.dirname(sys.executable), "CHANGELOG.md"))
+        changelog_path = next((p for p in candidates if os.path.isfile(p)), None)
+
+        if changelog_path:
+            try:
+                from PyQt6.QtWidgets import QDialog, QTextBrowser, QDialogButtonBox
                 with open(changelog_path, 'r', encoding='utf-8') as f:
                     changelog_text = f.read()
-            else:
-                changelog_text = "CHANGELOG.md file not found."
-        except Exception as e:
-            changelog_text = f"Error reading CHANGELOG.md: {str(e)}"
-        
-        # Convert markdown to basic HTML for display
-        changelog_html = changelog_text.replace('\n', '<br>').replace('**', '<b>').replace('**', '</b>')
-        
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Changelog")
-        msg.setTextFormat(Qt.TextFormat.RichText)
-        msg.setText(changelog_html)
-        msg.setIcon(QMessageBox.Icon.Information)
-        msg.setStandardButtons(QMessageBox.StandardButton.Ok)
-        msg.exec()
+
+                dialog = QDialog(self)
+                dialog.setWindowTitle("Changelog")
+                dialog.resize(740, 560)
+                layout = QVBoxLayout(dialog)
+
+                text_browser = QTextBrowser()
+                text_browser.setOpenExternalLinks(True)
+                text_browser.setMarkdown(changelog_text)
+                layout.addWidget(text_browser)
+
+                button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok)
+                button_box.accepted.connect(dialog.accept)
+                layout.addWidget(button_box)
+
+                dialog.exec()
+                return
+            except Exception as e:
+                print(f"Error showing local changelog: {e}")
+
+        # Local file unavailable (compiled EXE, or source tree missing) —
+        # open the GitHub copy in the default browser.
+        import webbrowser
+        try:
+            webbrowser.open(self.CHANGELOG_URL)
+        except Exception:
+            QMessageBox.warning(self, "Changelog",
+                                f"Could not open changelog.\n\nURL: {self.CHANGELOG_URL}")
     
     def showAbout(self):
         """Display about dialog"""
