@@ -86,16 +86,11 @@ REM --- Step 6: Extract changelog and create GitHub Release ---
 echo [6/7] Creating GitHub Release with binary...
 
 REM Extract changelog section for this version into a temp file
-set "FOUND=0"
-(for /f "usebackq delims=" %%L in ("CHANGELOG.md") do (
-    set "LINE=%%L"
-    if !FOUND!==1 (
-        echo !LINE! | findstr /R "^## " >nul && goto :done_changelog
-        echo %%L
-    )
-    echo !LINE! | findstr /C:"[%VERSION%]" >nul && set "FOUND=1"
-)) > release_notes_temp.md
-:done_changelog
+REM (PowerShell regex: everything after "## [VERSION]" up to the next "## [" header)
+powershell -NoProfile -Command "$c = Get-Content -Raw -Encoding UTF8 CHANGELOG.md; $m = [regex]::Match($c, '(?ms)^## \[' + [regex]::Escape('%VERSION%') + '\][^\n]*\n(.*?)(?=^## \[|\z)'); $n = $m.Groups[1].Value.Trim() + \"`n`n## Download`n[csv-reader.exe](https://github.com/juren53/csv-reader/releases/download/v%VERSION%/csv-reader.exe) - standalone Windows 11 executable, no Python required.`n\"; [IO.File]::WriteAllText('release_notes_temp.md', $n)"
+for %%F in (release_notes_temp.md) do if %%~zF LSS 200 (
+    echo WARNING: No CHANGELOG.md section found for [%VERSION%] - release notes will be minimal.
+)
 
 REM Create the release
 gh release create v%VERSION% ^
