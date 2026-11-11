@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.8] - 2026-11-11 1048 CST
+
+### Fixed
+- **Record View editing**: `H`, `Left`, and `Right` keystrokes were captured by the global event filter while typing in an edit field, opening the "Select Header Row" dialog mid-input. Navigation shortcuts are now skipped while record edit mode is active.
+
+### Documentation
+- **README**: Added Windows executable download links — Releases page, a permanent direct-download URL (`releases/latest/download/csv-reader.exe`), and the latest release
+- **Project_Rules.md**: Every GitHub release must attach `csv-reader.exe`
+
+### Build
+- **Windows executable**: `csv-reader.exe` attached to this release
+
 ## [0.1.7] - 2026-05-26 CST
 
 ### Added
@@ -243,6 +255,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.1.8]: https://github.com/juren53/csv-reader/releases/tag/v0.1.8
 [0.1.7]: https://github.com/juren53/csv-reader/releases/tag/v0.1.7
 [0.1.6]: https://github.com/juren53/csv-reader/releases/tag/v0.1.6
 [0.1.5]: https://github.com/juren53/csv-reader/releases/tag/v0.1.5

@@ -13,6 +13,7 @@ Features:
 - Support for Excel files (.xlsx) using openpyxl
 
 Changelog:
+v0.1.8 2026-11-11 10:48 CST - Fixed H/arrow keys intercepted while editing Record View fields
 v0.1.7 2026-05-26 CST - Added data edit feature: inline table editing, record edit mode, Save/Save As
 v0.1.6 2026-02-18 09:44 CST - Integrated pyqt-app-info into Help/About dialog
 v0.1.5 2026-02-18 09:27 CST - Synced run.ps1/run.sh from Python-venv generic template
@@ -346,7 +347,7 @@ class CSVReaderApp(QMainWindow):
     """Main application window for CSV Reader"""
     
     MAX_RECENT_FILES = 10
-    VERSION = "v0.1.7  2026-05-26  CST"
+    VERSION = "v0.1.8  2026-11-11  10:48 CST"
     
     def __init__(self):
         super().__init__()
