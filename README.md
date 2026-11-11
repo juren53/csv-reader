@@ -1,6 +1,6 @@
 # CSV Reader
 
-**Version:** v0.1.8 (2026-11-11)
+**Version:** v0.1.8a (2026-11-11)
 
 A PyQt6-based application for viewing CSV and XLSX files with dual view modes — record-by-record or spreadsheet table.
 
@@ -59,7 +59,7 @@ https://github.com/juren53/csv-reader/releases
 
 **Direct download (always the newest build):** [csv-reader.exe](https://github.com/juren53/csv-reader/releases/latest/download/csv-reader.exe)
 
-**Latest release:** [v0.1.8](https://github.com/juren53/csv-reader/releases/tag/v0.1.8) — Fixes H/arrow keys being intercepted while editing fields in Record View
+**Latest release:** [v0.1.8a](https://github.com/juren53/csv-reader/releases/tag/v0.1.8a) — Fixes Help > Changelog in the EXE (falls back to the GitHub CHANGELOG)
 
 See `WINDOWS-INSTALLATION-GUIDE.md` for installation and file-association details.
 
