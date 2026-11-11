@@ -44,9 +44,20 @@ echo.
 
 REM --- Step 4: Build the executable ---
 echo [4/7] Building executable with PyInstaller...
+set "VENV_PYTHON=%~dp0venv\Scripts\python.exe"
+if not exist "%VENV_PYTHON%" (
+    echo ERROR: Virtual environment not found. Run .\run.ps1 first to create it.
+    exit /b 1
+)
+REM Ensure PyInstaller is installed in the venv (no-op if already present)
+"%VENV_PYTHON%" -m pip install pyinstaller --quiet
+if errorlevel 1 (
+    echo ERROR: Failed to install PyInstaller into the venv.
+    exit /b 1
+)
 if exist build rmdir /s /q build
 if exist dist\csv-reader.exe del /f dist\csv-reader.exe
-pyinstaller --clean CSV-Reader.spec
+"%VENV_PYTHON%" -m PyInstaller --clean --noconfirm CSV-Reader.spec
 if not exist dist\csv-reader.exe (
     echo ERROR: Build failed! dist\csv-reader.exe not found.
     exit /b 1
