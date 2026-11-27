@@ -57,7 +57,17 @@ if errorlevel 1 (
 )
 if exist build rmdir /s /q build
 if exist dist\csv-reader.exe del /f dist\csv-reader.exe
+REM del reports success even when the file is locked, so check it is really gone
+if exist dist\csv-reader.exe (
+    echo ERROR: Cannot delete dist\csv-reader.exe - it is probably running.
+    echo Close CSV Reader and run this script again.
+    exit /b 1
+)
 "%VENV_PYTHON%" -m PyInstaller --clean --noconfirm CSV-Reader.spec
+if errorlevel 1 (
+    echo ERROR: PyInstaller failed.
+    exit /b 1
+)
 if not exist dist\csv-reader.exe (
     echo ERROR: Build failed! dist\csv-reader.exe not found.
     exit /b 1
