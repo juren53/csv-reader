@@ -48,6 +48,8 @@ from PyQt6.QtCore import Qt, QSettings, QSize, QEvent, pyqtSignal
 from PyQt6.QtGui import QFont, QKeySequence, QFontMetrics, QPalette, QAction, QColor, QIcon
 
 from icon_loader import icons
+from cell_format import (format_cell, parse_number, parse_date,
+                         is_date_format, is_number_format)
 
 try:
     from pyqt_app_info import AppIdentity, gather_info
@@ -60,31 +62,36 @@ _INT_RE = re.compile(r'^-?(0|[1-9]\d*)$')
 _FLOAT_RE = re.compile(r'^-?(0|[1-9]\d*)?\.\d+([eE][-+]?\d+)?$|^-?(0|[1-9]\d*)[eE][-+]?\d+$')
 
 
-def coerce_cell_value(text, original):
-    """Convert edited text back to a typed cell value, guided by the
-    original cell value so numbers/dates/bools are not saved as text."""
+def coerce_cell_value(text, original, number_format=None):
+    """Convert edited text back to a typed cell value, guided by the original
+    cell value and its number format, so numbers/dates/bools are not saved as
+    text. Formatted input such as "$1,250.00", "12%" or "9/4/2026" is understood."""
     if text == '':
         return None
+    t = text.strip()
     if isinstance(original, bool):
-        if text.strip().lower() in ('true', 'false'):
-            return text.strip().lower() == 'true'
+        if t.lower() in ('true', 'false'):
+            return t.lower() == 'true'
         return text
-    if isinstance(original, (int, float)) or original is None:
-        t = text.strip()
+    if isinstance(original, (int, float)) or (original is None and is_number_format(number_format)):
+        value = parse_number(t)
+        return text if value is None else value
+    if isinstance(original, (datetime.datetime, datetime.date, datetime.time)) or \
+            (original is None and is_date_format(number_format)):
+        value = parse_date(t, number_format)
+        if value is None:
+            return text
+        if isinstance(original, datetime.time):
+            return value.time()
+        if isinstance(original, datetime.date) and not isinstance(original, datetime.datetime):
+            return value.date()
+        return value
+    if original is None:
+        # Blank General cell: plain numbers become numbers, leading zeros stay text
         if _INT_RE.match(t):
             return int(t)
         if _FLOAT_RE.match(t):
             return float(t)
-        return text
-    if isinstance(original, (datetime.datetime, datetime.date, datetime.time)):
-        cls = type(original)
-        try:
-            return cls.fromisoformat(text.strip())
-        except ValueError:
-            try:
-                return datetime.datetime.fromisoformat(text.strip())
-            except ValueError:
-                return text
     return text
 
 
@@ -917,7 +924,7 @@ class CSVReaderApp(QMainWindow):
 <h3>Supported File Formats</h3>
 <ul>
 <li><b>CSV Files</b>: Standard comma-separated values files (.csv)</li>
-<li><b>Excel Files</b>: Excel workbook files (.xlsx) - all sheets; switch with the tabs at the bottom or Ctrl+PgUp / Ctrl+PgDn. Formula cells are shown in italics and are read-only. Save As .csv offers the current sheet or one file per sheet.</li>
+<li><b>Excel Files</b>: Excel workbook files (.xlsx) - all sheets; switch with the tabs at the bottom or Ctrl+PgUp / Ctrl+PgDn. Cells are shown with their Excel number format (currency, dates, percentages). Formula cells are shown in italics and are read-only. Save As .csv offers the current sheet or one file per sheet.</li>
 </ul>
 
 <h3>View Modes</h3>
@@ -1158,7 +1165,7 @@ class CSVReaderApp(QMainWindow):
     def _newSheetState(name):
         return {'name': name, 'loaded': False, 'headers': [], 'data': [],
                 'record_index': 0, 'raw': [], 'row_origins': [], 'dirty_cells': set(),
-                'formulas': {}}
+                'formulas': {}, 'formats': {}}
 
     @staticmethod
     def _fillSheetState(state, formula_sheet, cached_sheet_fn):
@@ -1169,10 +1176,16 @@ class CSVReaderApp(QMainWindow):
         cached (calculated) values, so formula-free sheets are read once."""
         # Pass 1: values and formula candidates. Start at A1 so index == sheet row - 1
         rows = []
+        formats = {}     # {(sheet_row, col): number format} for non-General cells
         candidates = {}  # {sheet_row: {col: formula text}}
-        for sheet_row, frow in enumerate(
-                formula_sheet.iter_rows(min_row=1, min_col=1, values_only=True), 1):
-            row = list(frow)
+        for sheet_row, cells in enumerate(
+                formula_sheet.iter_rows(min_row=1, min_col=1), 1):
+            row = []
+            for col, cell in enumerate(cells):
+                row.append(getattr(cell, 'value', cell))
+                fmt = getattr(cell, 'number_format', None)
+                if fmt and fmt != 'General':
+                    formats[(sheet_row, col)] = fmt
             for col, fval in enumerate(row):
                 ftext = getattr(fval, 'text', fval)  # ArrayFormula has .text
                 if isinstance(ftext, str) and ftext.startswith('='):
@@ -1197,7 +1210,8 @@ class CSVReaderApp(QMainWindow):
         raw = []
         data = []
         for sheet_row, row in enumerate(rows, 1):
-            text = [str(cell) if cell is not None else '' for cell in row]
+            text = [format_cell(cell, formats.get((sheet_row, col), 'General'))
+                    for col, cell in enumerate(row)]
             for col, ftext in formulas.get(sheet_row, {}).items():
                 if (sheet_row, col) in no_cache:
                     text[col] = ftext  # no cached value (e.g. saved by openpyxl)
@@ -1207,7 +1221,7 @@ class CSVReaderApp(QMainWindow):
         while data and not any(data[-1]):
             data.pop()
             raw.pop()
-        state.update(loaded=True, raw=raw, formulas=formulas,
+        state.update(loaded=True, raw=raw, formulas=formulas, formats=formats,
                      headers=data[0] if data else [],
                      data=data[1:],
                      row_origins=list(range(1, len(data) + 1)),
@@ -1834,7 +1848,10 @@ class CSVReaderApp(QMainWindow):
                 text = values[col] if col < len(values) else ''
                 orig_row = raw[sheet_row - 1] if sheet_row - 1 < len(raw) else ()
                 original = orig_row[col] if col < len(orig_row) else None
-                value = coerce_cell_value(text, original)
+                fmt = state['formats'].get((sheet_row, col))
+                value = coerce_cell_value(text, original, fmt)
+                if not isinstance(value, str) and col < len(values):
+                    values[col] = format_cell(value, fmt or 'General')  # show as Excel would
                 sheet.cell(row=sheet_row, column=col + 1).value = value
                 values_written[(sheet_row, col)] = value
             written.append((state, values_written))
@@ -1854,6 +1871,8 @@ class CSVReaderApp(QMainWindow):
                 raw[sheet_row - 1] = tuple(row)
             state['dirty_cells'].clear()  # same set object as self.dirty_cells when active
         src['path'] = file_path
+        if written:
+            self.displayCurrentRecord()  # show saved cells in their Excel format
 
     def _atomicSave(self, workbook, file_path):
         """Save via a temp file in the same folder so a failed save

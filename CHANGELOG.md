@@ -22,7 +22,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Formula detection adds no load time for sheets without formulas
 - **Save As `.csv` from a multi-sheet workbook** is now an export: choose **Current Sheet** or **One File per Sheet** (`name_SheetName.csv`, empty sheets skipped, confirmation before replacing existing files)
   - The workbook stays open as the current file, and unsaved workbook edits stay marked as unsaved (previously the CSV save cleared the unsaved flag, so edits on other sheets could be lost on close)
-- **Test suite**: `tests/` pytest suite (45 tests) covering XLSX save round trips, multi-sheet switching, formula locking and CSV export; runs headless with isolated settings (`pip install -r requirements-dev.txt`, `python -m pytest`)
+- **Excel cell formatting**: XLSX cells display with their Excel number format — currency (`$12.50`), thousands separators, percentages, accounting, scientific, and date/time formats (`9/3/2026`, `3-Sep-26`, `2:05 PM`); booleans show as `TRUE`/`FALSE`
+  - Edited text is parsed back using the cell's format: `$1,250.00`, `30%`, `(5)` and `9/4/2026` save as real numbers and dates, and the cell's format is kept
+  - Unedited cells are never rewritten, so rounding in the display (e.g. `25.6%`) does not change stored values
+  - CSV export writes values as displayed, like Excel's Save As CSV
+  - New module `cell_format.py`; unsupported formats (fractions, digit masks) fall back to the plain value
+  - Reading formats makes XLSX loading roughly 25% slower
+- **Test suite**: `tests/` pytest suite (113 tests) covering XLSX save round trips, multi-sheet switching, formula locking and CSV export; runs headless with isolated settings (`pip install -r requirements-dev.txt`, `python -m pytest`)
 
 ### Fixed
 - **XLSX Save no longer destroys the workbook**: Save previously rebuilt the file from scratch, deleting every sheet but the first, converting numbers and dates to text, replacing formulas with values, and dropping all formatting
