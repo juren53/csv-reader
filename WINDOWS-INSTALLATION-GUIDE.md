@@ -127,6 +127,6 @@ For issues and feature requests:
 
 ---
 
-**Version:** v0.1.8a
-**Last Updated:** 2026-11-11
+**Version:** v0.1.9
+**Last Updated:** 2026-11-26
 **Platform:** Windows 11

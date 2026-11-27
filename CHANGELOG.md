@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-11-26 2033 CST
+
 ### Added
 - **Multi-sheet XLSX support**: All worksheets in a workbook can now be viewed and edited
   - Excel-style sheet tabs at the bottom of the window (shown only for workbooks with more than one sheet)
@@ -293,6 +295,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.1.9]: https://github.com/juren53/csv-reader/releases/tag/v0.1.9
 [0.1.8a]: https://github.com/juren53/csv-reader/releases/tag/v0.1.8a
 [0.1.8]: https://github.com/juren53/csv-reader/releases/tag/v0.1.8
 [0.1.7]: https://github.com/juren53/csv-reader/releases/tag/v0.1.7

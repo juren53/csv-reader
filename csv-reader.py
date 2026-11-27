@@ -13,6 +13,7 @@ Features:
 - Support for Excel files (.xlsx) using openpyxl
 
 Changelog:
+v0.1.9 2026-11-26 20:33 CST - Multi-sheet XLSX (sheet tabs), in-place XLSX save, read-only formulas, CSV export
 v0.1.8a 2026-11-11 11:02 CST - Changelog falls back to GitHub when CHANGELOG.md is not local (EXE)
 v0.1.8 2026-11-11 10:48 CST - Fixed H/arrow keys intercepted while editing Record View fields
 v0.1.7 2026-05-26 CST - Added data edit feature: inline table editing, record edit mode, Save/Save As
@@ -416,7 +417,7 @@ class CSVReaderApp(QMainWindow):
     """Main application window for CSV Reader"""
     
     MAX_RECENT_FILES = 10
-    VERSION = "v0.1.8a  2026-11-11  11:02 CST"
+    VERSION = "v0.1.9  2026-11-26  20:33 CST"
     
     def __init__(self):
         super().__init__()
