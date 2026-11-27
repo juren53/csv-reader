@@ -42,7 +42,7 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                            QHBoxLayout, QGridLayout, QLabel, QScrollArea, 
                            QFileDialog, QMessageBox, QMenu, QSizePolicy,
                            QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
-                           QLineEdit, QPushButton)
+                           QLineEdit, QPushButton, QTabBar)
 from PyQt6.QtCore import Qt, QSettings, QSize, QEvent, pyqtSignal
 from PyQt6.QtGui import QFont, QKeySequence, QFontMetrics, QPalette, QAction, QColor, QIcon
 
@@ -158,6 +158,10 @@ class TableView(QTableWidget):
         try:
             if not headers or not data:
                 self.clear()
+                self.setRowCount(0)
+                self.setColumnCount(len(headers) if headers else 0)
+                if headers:
+                    self.setHorizontalHeaderLabels(headers)
                 return
 
             # Set table dimensions
@@ -402,7 +406,7 @@ class CSVReaderApp(QMainWindow):
         self.record_edit_mode = False
 
         # XLSX in-place save tracking
-        self.xlsx_source = None      # {'path', 'sheet', 'raw'} of the loaded workbook
+        self.xlsx_source = None      # {'path', 'sheets': [sheet state], 'active': index}
         self.row_origins = []        # sheet row (1-based) for [headers] + csv_data
         self.dirty_cells = set()     # {(sheet_row, col0)} edited since last XLSX save
         
@@ -533,6 +537,16 @@ class CSVReaderApp(QMainWindow):
         nav_layout.addWidget(self.edit_record_btn)
 
         main_layout.addWidget(self.nav_widget)
+
+        # Sheet tabs (only shown for multi-sheet workbooks)
+        self.sheet_tabs = QTabBar()
+        self.sheet_tabs.setShape(QTabBar.Shape.RoundedSouth)
+        self.sheet_tabs.setExpanding(False)
+        self.sheet_tabs.setUsesScrollButtons(True)
+        self.sheet_tabs.setDocumentMode(True)
+        self.sheet_tabs.currentChanged.connect(self.switchSheet)
+        self.sheet_tabs.hide()
+        main_layout.addWidget(self.sheet_tabs)
         
         self.setCentralWidget(central_widget)
         
@@ -612,6 +626,20 @@ class CSVReaderApp(QMainWindow):
         toggle_view_action.setShortcut(QKeySequence('Ctrl+T'))
         toggle_view_action.triggered.connect(self.toggleView)
         view_menu.addAction(toggle_view_action)
+
+        view_menu.addSeparator()
+
+        self.next_sheet_action = QAction('&Next Sheet', self)
+        self.next_sheet_action.setShortcut(QKeySequence('Ctrl+PgDown'))
+        self.next_sheet_action.triggered.connect(lambda: self.switchSheetBy(1))
+        self.next_sheet_action.setEnabled(False)
+        view_menu.addAction(self.next_sheet_action)
+
+        self.prev_sheet_action = QAction('&Previous Sheet', self)
+        self.prev_sheet_action.setShortcut(QKeySequence('Ctrl+PgUp'))
+        self.prev_sheet_action.triggered.connect(lambda: self.switchSheetBy(-1))
+        self.prev_sheet_action.setEnabled(False)
+        view_menu.addAction(self.prev_sheet_action)
         
         # Help menu
         help_menu = menubar.addMenu('&Help')
@@ -722,14 +750,23 @@ class CSVReaderApp(QMainWindow):
     
     def updateStatusBar(self):
         """Update status bar with current view mode and statistics"""
+        sheet = ''
+        if self.xlsx_source and len(self.xlsx_source['sheets']) > 1:
+            src = self.xlsx_source
+            sheet = (f"Sheet {src['active'] + 1}/{len(src['sheets'])}: "
+                     f"{src['sheets'][src['active']]['name']} | ")
+
         if not self.csv_data or not self.headers:
-            self.statusBar().showMessage(f'Ready | {self.VERSION}')
+            if self.xlsx_source:
+                self.statusBar().showMessage(f"{sheet}Sheet has no data rows | {self.VERSION}")
+            else:
+                self.statusBar().showMessage(f'Ready | {self.VERSION}')
             return
             
         if self.current_view_mode == "record":
-            self.statusBar().showMessage(f"Record View - Record {self.current_record_index + 1} of {len(self.csv_data)} | {self.VERSION}")
+            self.statusBar().showMessage(f"{sheet}Record View - Record {self.current_record_index + 1} of {len(self.csv_data)} | {self.VERSION}")
         else:
-            self.statusBar().showMessage(f"Table View - {len(self.csv_data)} rows, {len(self.headers)} columns | {self.VERSION}")
+            self.statusBar().showMessage(f"{sheet}Table View - {len(self.csv_data)} rows, {len(self.headers)} columns | {self.VERSION}")
     
     def updateRecentFilesMenu(self):
         """Update the recent files menu with stored recent files"""
@@ -849,7 +886,7 @@ class CSVReaderApp(QMainWindow):
 <h3>Supported File Formats</h3>
 <ul>
 <li><b>CSV Files</b>: Standard comma-separated values files (.csv)</li>
-<li><b>Excel Files</b>: Excel workbook files (.xlsx) - first sheet only</li>
+<li><b>Excel Files</b>: Excel workbook files (.xlsx) - all sheets; switch with the tabs at the bottom or Ctrl+PgUp / Ctrl+PgDn</li>
 </ul>
 
 <h3>View Modes</h3>
@@ -977,7 +1014,7 @@ class CSVReaderApp(QMainWindow):
                 description="A PyQt6-based application for viewing CSV and XLSX files with both record and table view modes.",
                 features=[
                     "Support for CSV and XLSX files",
-                    "Multi-sheet XLSX files (loads first sheet)",
+                    "Multi-sheet XLSX files (sheet tabs, Ctrl+PgUp/PgDn)",
                     "Dual view modes (Record and Table)",
                     "Dynamic header row selection",
                     "Keyboard navigation and shortcuts",
@@ -996,7 +1033,7 @@ class CSVReaderApp(QMainWindow):
 <p><b>Features:</b></p>
 <ul>
 <li>Support for CSV and XLSX files</li>
-<li>Multi-sheet XLSX files (loads first sheet)</li>
+<li>Multi-sheet XLSX files (sheet tabs, Ctrl+PgUp/PgDn)</li>
 <li>Dual view modes (Record and Table)</li>
 <li>Dynamic header row selection</li>
 <li>Keyboard navigation and shortcuts</li>
@@ -1063,7 +1100,7 @@ class CSVReaderApp(QMainWindow):
         self.dirty_cells = set()
 
     def _loadXLSXData(self, file_path):
-        """Parse XLSX file and populate headers and csv_data"""
+        """Open an XLSX workbook: read the first sheet now, the rest on first view"""
         if not XLSX_SUPPORT_AVAILABLE:
             raise Exception(
                 "XLSX support requires the 'openpyxl' library.\n\n"
@@ -1075,36 +1112,136 @@ class CSVReaderApp(QMainWindow):
         except Exception as e:
             raise Exception(f"Failed to open XLSX file: {str(e)}")
 
-        if len(workbook.sheetnames) == 0:
-            raise Exception("XLSX file contains no sheets")
+        try:
+            if len(workbook.sheetnames) == 0:
+                raise Exception("XLSX file contains no sheets")
+            sheets = [self._newSheetState(name) for name in workbook.sheetnames]
+            self._fillSheetState(sheets[0], workbook[sheets[0]['name']])
+        finally:
+            workbook.close()
 
-        sheet_name = workbook.sheetnames[0]
-        sheet = workbook[sheet_name]
+        self.xlsx_source = {'path': file_path, 'sheets': sheets, 'active': 0}
+        self._restoreSheet(0)
 
-        # Convert sheet to list of lists; start at A1 so list index == sheet row - 1
+    @staticmethod
+    def _newSheetState(name):
+        return {'name': name, 'loaded': False, 'headers': [], 'data': [],
+                'record_index': 0, 'raw': [], 'row_origins': [], 'dirty_cells': set()}
+
+    @staticmethod
+    def _fillSheetState(state, sheet):
+        """Read a worksheet into a sheet-state dict"""
         raw = []
         data = []
+        # Start at A1 so list index == sheet row - 1
         for row in sheet.iter_rows(min_row=1, min_col=1, values_only=True):
             raw.append(row)
             data.append([str(cell) if cell is not None else '' for cell in row])
+        # Drop trailing all-blank rows (formatting-only rows inflate max_row)
+        while data and not any(data[-1]):
+            data.pop()
+            raw.pop()
+        state.update(loaded=True, raw=raw,
+                     headers=data[0] if data else [],
+                     data=data[1:],
+                     row_origins=list(range(1, len(data) + 1)),
+                     record_index=0, dirty_cells=set())
 
-        workbook.close()
+    def _ensureSheetLoaded(self, index):
+        state = self.xlsx_source['sheets'][index]
+        if state['loaded']:
+            return
+        workbook = openpyxl.load_workbook(self.xlsx_source['path'], read_only=True, data_only=True)
+        try:
+            self._fillSheetState(state, workbook[state['name']])
+        finally:
+            workbook.close()
 
-        if not data:
-            raise Exception("First sheet is empty")
+    def _stashActiveSheet(self):
+        """Copy the working globals back into the active sheet's state"""
+        if not self.xlsx_source:
+            return
+        state = self.xlsx_source['sheets'][self.xlsx_source['active']]
+        state.update(headers=self.headers, data=self.csv_data,
+                     record_index=self.current_record_index,
+                     row_origins=self.row_origins, dirty_cells=self.dirty_cells)
 
-        # Extract headers (first row)
-        self.headers = data[0]
+    def _restoreSheet(self, index):
+        """Make sheet `index` the working data"""
+        state = self.xlsx_source['sheets'][index]
+        self.xlsx_source['active'] = index
+        self.headers = state['headers']
+        self.csv_data = state['data']
+        self.current_record_index = min(state['record_index'], max(len(state['data']) - 1, 0))
+        self.row_origins = state['row_origins']
+        self.dirty_cells = state['dirty_cells']
 
-        # Remove headers from data
-        self.csv_data = data[1:]
+    def _refreshSheetTabs(self):
+        """Populate / hide the sheet tab bar for the loaded file"""
+        multi = bool(self.xlsx_source) and len(self.xlsx_source['sheets']) > 1
+        self.sheet_tabs.blockSignals(True)
+        while self.sheet_tabs.count():
+            self.sheet_tabs.removeTab(0)
+        if multi:
+            for state in self.xlsx_source['sheets']:
+                self.sheet_tabs.addTab(state['name'])
+            self.sheet_tabs.setCurrentIndex(self.xlsx_source['active'])
+        self.sheet_tabs.blockSignals(False)
+        self.sheet_tabs.setVisible(multi)
+        self.next_sheet_action.setEnabled(multi)
+        self.prev_sheet_action.setEnabled(multi)
 
-        if not self.csv_data:
-            raise Exception("No data records found (only headers present)")
+    def _finishTableEdit(self):
+        """Commit an open inline table editor (its focus-out commits the value)"""
+        if self.table_view.state() == QAbstractItemView.State.EditingState:
+            focus = QApplication.focusWidget()
+            if focus is not None and self.table_view.isAncestorOf(focus):
+                focus.clearFocus()
 
-        self.xlsx_source = {'path': file_path, 'sheet': sheet_name, 'raw': raw}
-        self.row_origins = list(range(1, len(data) + 1))
-        self.dirty_cells = set()
+    def switchSheetBy(self, step):
+        if self.xlsx_source and len(self.xlsx_source['sheets']) > 1:
+            count = len(self.xlsx_source['sheets'])
+            self.switchSheet((self.xlsx_source['active'] + step) % count)
+
+    def switchSheet(self, index):
+        """Switch the views to another worksheet of the open workbook"""
+        src = self.xlsx_source
+        if not src or not (0 <= index < len(src['sheets'])) or index == src['active']:
+            return
+
+        self._finishTableEdit()
+        if self.record_edit_mode:
+            self._commitRecordEdits(refresh=False)
+
+        try:
+            self._ensureSheetLoaded(index)
+        except Exception as e:
+            QMessageBox.critical(self, "Error",
+                                 f"Failed to read sheet '{src['sheets'][index]['name']}': {str(e)}")
+            self._refreshSheetTabs()  # snap the tab back to the active sheet
+            return
+
+        self._stashActiveSheet()
+        self._restoreSheet(index)
+
+        self.sheet_tabs.blockSignals(True)
+        self.sheet_tabs.setCurrentIndex(index)
+        self.sheet_tabs.blockSignals(False)
+
+        if self.search_visible:
+            self.clearTableSearch()
+        self._updateTitle()
+        self.displayCurrentRecord()
+
+    def _updateTitle(self):
+        title = "CSV/XLSX Reader"
+        if self.current_file_path:
+            title += f" - {self.current_file_path}"
+            if self.xlsx_source and len(self.xlsx_source['sheets']) > 1:
+                title += f" [{self.xlsx_source['sheets'][self.xlsx_source['active']]['name']}]"
+        if self.is_modified:
+            title += " *"
+        self.setWindowTitle(title)
 
     def loadDataFile(self, file_path):
         """Load and parse a CSV or XLSX file"""
@@ -1135,7 +1272,6 @@ class CSVReaderApp(QMainWindow):
 
             # Update UI
             self.current_file_path = file_path
-            self.setWindowTitle(f"CSV/XLSX Reader - {file_path}")
 
             # Display data based on current view mode
             if self.current_view_mode == "record":
@@ -1154,6 +1290,8 @@ class CSVReaderApp(QMainWindow):
             self.record_edit_mode = False
             self.edit_record_btn.setText("Edit")
             self.record_view.edit_mode = False
+            self._updateTitle()
+            self._refreshSheetTabs()
 
             # Update status
             self.updateStatusBar()
@@ -1171,7 +1309,13 @@ class CSVReaderApp(QMainWindow):
     def displayCurrentRecord(self):
         """Display the current record or table based on view mode"""
         if not self.csv_data or not self.headers:
-            self.nav_label.setText("No file loaded")
+            if self.xlsx_source:
+                self.nav_label.setText("Sheet has no data rows")
+                self.record_view.displayRecord([], [])
+                self.table_view.displayData(self.headers, [])
+                self.updateStatusBar()
+            else:
+                self.nav_label.setText("No file loaded")
             return
             
         if self.current_view_mode == "record":
@@ -1353,15 +1497,11 @@ class CSVReaderApp(QMainWindow):
     def _markModified(self):
         if not self.is_modified:
             self.is_modified = True
-            title = self.windowTitle()
-            if not title.endswith(' *'):
-                self.setWindowTitle(title + ' *')
+            self._updateTitle()
 
     def _markSaved(self):
         self.is_modified = False
-        title = self.windowTitle()
-        if title.endswith(' *'):
-            self.setWindowTitle(title[:-2])
+        self._updateTitle()
 
     def closeEvent(self, event):
         if self.is_modified:
@@ -1429,7 +1569,10 @@ class CSVReaderApp(QMainWindow):
             self._commitRecordEdits()
 
     def saveFile(self):
-        if not self.csv_data:
+        self._finishTableEdit()
+        if self.record_edit_mode:
+            self._commitRecordEdits()
+        if not self.csv_data and not self.is_modified:
             return
         if not self.current_file_path:
             self.saveFileAs()
@@ -1446,7 +1589,7 @@ class CSVReaderApp(QMainWindow):
             QMessageBox.critical(self, "Save Error", f"Failed to save file: {str(e)}")
 
     def saveFileAs(self):
-        if not self.csv_data:
+        if not self.csv_data and not self.xlsx_source:
             return
         file_path, _ = QFileDialog.getSaveFileName(
             self, "Save File As",
@@ -1455,7 +1598,7 @@ class CSVReaderApp(QMainWindow):
         )
         if file_path:
             self.current_file_path = file_path
-            self.setWindowTitle(f"CSV/XLSX Reader - {file_path}")
+            self._updateTitle()
             self.saveFile()
 
     def _saveCSV(self, file_path):
@@ -1482,40 +1625,47 @@ class CSVReaderApp(QMainWindow):
         self._atomicSave(workbook, file_path)
 
     def _patchXLSX(self, file_path):
-        """Re-open the source workbook and write only edited cells, so other
-        sheets, formulas, formatting and value types are preserved."""
+        """Re-open the source workbook and write only edited cells (on every
+        sheet), so other sheets, formulas, formatting and value types are kept."""
         src = self.xlsx_source
+        self._stashActiveSheet()
         workbook = openpyxl.load_workbook(src['path'])  # full mode: keeps formulas/styles
-        sheet = workbook[src['sheet']]
-        raw = src['raw']
 
-        # Map sheet row -> current row values ([headers] + csv_data)
-        current = dict(zip(self.row_origins, [self.headers] + self.csv_data))
-        written = {}
-        for sheet_row, col in self.dirty_cells:
-            values = current.get(sheet_row)
-            if values is None:
+        written = []  # (state, {(sheet_row, col): value})
+        for state in src['sheets']:
+            if not state['dirty_cells']:
                 continue
-            text = values[col] if col < len(values) else ''
-            orig_row = raw[sheet_row - 1] if sheet_row - 1 < len(raw) else ()
-            original = orig_row[col] if col < len(orig_row) else None
-            value = coerce_cell_value(text, original)
-            sheet.cell(row=sheet_row, column=col + 1).value = value
-            written[(sheet_row, col)] = value
+            sheet = workbook[state['name']]
+            raw = state['raw']
+            current = dict(zip(state['row_origins'], [state['headers']] + state['data']))
+            values_written = {}
+            for sheet_row, col in state['dirty_cells']:
+                values = current.get(sheet_row)
+                if values is None:
+                    continue
+                text = values[col] if col < len(values) else ''
+                orig_row = raw[sheet_row - 1] if sheet_row - 1 < len(raw) else ()
+                original = orig_row[col] if col < len(orig_row) else None
+                value = coerce_cell_value(text, original)
+                sheet.cell(row=sheet_row, column=col + 1).value = value
+                values_written[(sheet_row, col)] = value
+            written.append((state, values_written))
 
         self._atomicSave(workbook, file_path)
 
         # The saved file is now the baseline for future saves
-        for (sheet_row, col), value in written.items():
-            row = list(raw[sheet_row - 1]) if sheet_row - 1 < len(raw) else []
-            while len(row) <= col:
-                row.append(None)
-            row[col] = value
-            while len(raw) < sheet_row:
-                raw.append(())
-            raw[sheet_row - 1] = tuple(row)
+        for state, values_written in written:
+            raw = state['raw']
+            for (sheet_row, col), value in values_written.items():
+                while len(raw) < sheet_row:
+                    raw.append(())
+                row = list(raw[sheet_row - 1])
+                while len(row) <= col:
+                    row.append(None)
+                row[col] = value
+                raw[sheet_row - 1] = tuple(row)
+            state['dirty_cells'].clear()  # same set object as self.dirty_cells when active
         src['path'] = file_path
-        self.dirty_cells = set()
 
     def _atomicSave(self, workbook, file_path):
         """Save via a temp file in the same folder so a failed save

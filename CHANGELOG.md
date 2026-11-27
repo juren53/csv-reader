@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- **Multi-sheet XLSX support**: All worksheets in a workbook can now be viewed and edited
+  - Excel-style sheet tabs at the bottom of the window (shown only for workbooks with more than one sheet)
+  - `View > Next Sheet` (Ctrl+PgDn) / `Previous Sheet` (Ctrl+PgUp), wrapping around
+  - Each sheet keeps its own record position, header-row choice and unsaved edits
+  - Sheets are read on first view, so large workbooks open as fast as before
+  - Save writes edits from every sheet back into the workbook
+  - Status bar and title bar show the active sheet
+  - Empty and headers-only sheets display instead of failing to open
+
 ### Fixed
 - **XLSX Save no longer destroys the workbook**: Save previously rebuilt the file from scratch, deleting every sheet but the first, converting numbers and dates to text, replacing formulas with values, and dropping all formatting
   - Save now re-opens the original workbook and writes only the edited cells

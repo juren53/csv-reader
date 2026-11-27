@@ -9,7 +9,7 @@ A PyQt6-based application for viewing CSV and XLSX files with dual view modes â€
 - **Dual view modes**
   - **Record View**: Displays one record at a time with field names as labels (vertical layout)
   - **Table View**: Spreadsheet-style view with sortable columns
-- **CSV and XLSX support**: Opens `.csv` and `.xlsx` files (first sheet)
+- **CSV and XLSX support**: Opens `.csv` and `.xlsx` files; multi-sheet workbooks get Excel-style sheet tabs
 - **Dynamic header selection**: Press `H` in Record View to reassign any row as the header
 - **Search**: `Ctrl+F` searches across all cells in Table View with match highlighting
 - **Zoom**: `Ctrl+MouseWheel` adjusts text size (40%â€“300%) independently per view
@@ -82,6 +82,7 @@ python csv-reader.py mydata.xlsx
 | `Ctrl+O` | Open file |
 | `Ctrl+F` | Search (Table View) |
 | `Ctrl+T` | Toggle Record / Table view |
+| `Ctrl+PgDn` / `Ctrl+PgUp` | Next / previous sheet (multi-sheet XLSX) |
 | `Ctrl+MouseWheel` | Zoom in / out |
 | `Left / Right` | Previous / Next record (Record View) |
 | `H` | Set current record as header row (Record View) |
