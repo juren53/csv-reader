@@ -30,3 +30,6 @@ WINDOWS-INSTALLATION.md
 create-desktop-shortcut.bat
 fix-file-association-admin.bat
 fix-file-association.bat
+
+# Tests
+.pytest_cache/

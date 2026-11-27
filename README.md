@@ -96,6 +96,8 @@ csv-reader/
 ├── csv-reader.py               # Application entry point
 ├── icon_loader.py              # Cross-platform icon loader
 ├── requirements.txt            # Python dependencies
+├── requirements-dev.txt        # Test dependencies (pytest)
+├── tests/                      # pytest suite (headless)
 ├── run.sh                      # Linux/macOS/Git Bash launcher
 ├── run.ps1                     # Windows PowerShell launcher
 ├── csv-reader.bat              # Windows batch launcher
@@ -103,6 +105,17 @@ csv-reader/
 ├── CHANGELOG.md                # Version history
 └── WINDOWS-INSTALLATION-GUIDE.md  # Windows setup and deployment guide
 ```
+
+## Running Tests
+
+The test suite runs the app headless (no window appears) and never touches your saved settings or recent-files list.
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest
+```
+
+On Windows use `venv\Scripts\python -m pytest`; on Linux/macOS `venv/bin/python -m pytest`.
 
 ## Version History
 
