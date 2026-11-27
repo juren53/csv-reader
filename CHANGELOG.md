@@ -39,6 +39,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Save As `.xlsx` copies the full workbook with edits applied
   - Saves go through a temp file, so a failed save cannot leave a truncated workbook
 
+### Build
+- **`run.ps1`**: Upgrades pip with `python -m pip`; `pip.exe` cannot overwrite itself on Windows, so dependency install failed with "To modify pip, please run..."
+- **Windows executable**: `csv-reader.exe` attached to this release
+
 ## [0.1.8a] - 2026-11-11 1102 CST
 
 ### Fixed
