@@ -29,6 +29,9 @@ v0.0.5 2026-01-09 10:45 CST - Added dynamic header row selection feature
 import sys
 import os
 import csv
+import re
+import tempfile
+import datetime
 try:
     import openpyxl
     XLSX_SUPPORT_AVAILABLE = True
@@ -51,6 +54,38 @@ try:
     PYQT_APP_INFO_AVAILABLE = True
 except ImportError:
     PYQT_APP_INFO_AVAILABLE = False
+
+_INT_RE = re.compile(r'^-?(0|[1-9]\d*)$')
+_FLOAT_RE = re.compile(r'^-?(0|[1-9]\d*)?\.\d+([eE][-+]?\d+)?$|^-?(0|[1-9]\d*)[eE][-+]?\d+$')
+
+
+def coerce_cell_value(text, original):
+    """Convert edited text back to a typed cell value, guided by the
+    original cell value so numbers/dates/bools are not saved as text."""
+    if text == '':
+        return None
+    if isinstance(original, bool):
+        if text.strip().lower() in ('true', 'false'):
+            return text.strip().lower() == 'true'
+        return text
+    if isinstance(original, (int, float)) or original is None:
+        t = text.strip()
+        if _INT_RE.match(t):
+            return int(t)
+        if _FLOAT_RE.match(t):
+            return float(t)
+        return text
+    if isinstance(original, (datetime.datetime, datetime.date, datetime.time)):
+        cls = type(original)
+        try:
+            return cls.fromisoformat(text.strip())
+        except ValueError:
+            try:
+                return datetime.datetime.fromisoformat(text.strip())
+            except ValueError:
+                return text
+    return text
+
 
 class TableView(QTableWidget):
     """Widget to display CSV data in a spreadsheet-like table format"""
@@ -365,6 +400,11 @@ class CSVReaderApp(QMainWindow):
         self.search_visible = False
         self.is_modified = False
         self.record_edit_mode = False
+
+        # XLSX in-place save tracking
+        self.xlsx_source = None      # {'path', 'sheet', 'raw'} of the loaded workbook
+        self.row_origins = []        # sheet row (1-based) for [headers] + csv_data
+        self.dirty_cells = set()     # {(sheet_row, col0)} edited since last XLSX save
         
         # Set up the UI
         self.initUI()
@@ -1018,6 +1058,10 @@ class CSVReaderApp(QMainWindow):
         if not self.csv_data:
             raise Exception("No data records found")
 
+        self.xlsx_source = None
+        self.row_origins = []
+        self.dirty_cells = set()
+
     def _loadXLSXData(self, file_path):
         """Parse XLSX file and populate headers and csv_data"""
         if not XLSX_SUPPORT_AVAILABLE:
@@ -1034,13 +1078,15 @@ class CSVReaderApp(QMainWindow):
         if len(workbook.sheetnames) == 0:
             raise Exception("XLSX file contains no sheets")
 
-        sheet = workbook[workbook.sheetnames[0]]
+        sheet_name = workbook.sheetnames[0]
+        sheet = workbook[sheet_name]
 
-        # Convert sheet to list of lists
+        # Convert sheet to list of lists; start at A1 so list index == sheet row - 1
+        raw = []
         data = []
-        for row in sheet.iter_rows(values_only=True):
-            row_data = [str(cell) if cell is not None else '' for cell in row]
-            data.append(row_data)
+        for row in sheet.iter_rows(min_row=1, min_col=1, values_only=True):
+            raw.append(row)
+            data.append([str(cell) if cell is not None else '' for cell in row])
 
         workbook.close()
 
@@ -1055,6 +1101,10 @@ class CSVReaderApp(QMainWindow):
 
         if not self.csv_data:
             raise Exception("No data records found (only headers present)")
+
+        self.xlsx_source = {'path': file_path, 'sheet': sheet_name, 'raw': raw}
+        self.row_origins = list(range(1, len(data) + 1))
+        self.dirty_cells = set()
 
     def loadDataFile(self, file_path):
         """Load and parse a CSV or XLSX file"""
@@ -1272,6 +1322,13 @@ class CSVReaderApp(QMainWindow):
             if len(new_data[i]) < len(new_header_row):
                 new_data[i] = list(new_data[i]) + [''] * (len(new_header_row) - len(new_data[i]))
 
+        # Keep sheet-row origins aligned with the reordered rows
+        if self.row_origins:
+            header_origin, data_origins = self.row_origins[0], self.row_origins[1:]
+            self.row_origins = ([data_origins[new_header_index], header_origin]
+                                + data_origins[:new_header_index]
+                                + data_origins[new_header_index + 1:])
+
         # Update application state
         self.headers = new_header_row
         self.csv_data = new_data
@@ -1328,9 +1385,16 @@ class CSVReaderApp(QMainWindow):
             row_data = list(self.csv_data[row])
             while len(row_data) <= col:
                 row_data.append('')
-            row_data[col] = value
-            self.csv_data[row] = row_data
-            self._markModified()
+            if row_data[col] != value:
+                row_data[col] = value
+                self.csv_data[row] = row_data
+                self._markCellDirty(row, col)
+                self._markModified()
+
+    def _markCellDirty(self, data_row, col):
+        """Record an edited data cell by its original sheet position"""
+        if self.xlsx_source and data_row + 1 < len(self.row_origins):
+            self.dirty_cells.add((self.row_origins[data_row + 1], col))
 
     def _commitRecordEdits(self, refresh=True):
         if not self.record_edit_mode:
@@ -1339,8 +1403,14 @@ class CSVReaderApp(QMainWindow):
         if edited_values:
             if len(edited_values) < len(self.headers):
                 edited_values.extend([''] * (len(self.headers) - len(edited_values)))
-            self.csv_data[self.current_record_index] = edited_values
-            self._markModified()
+            old_values = self.csv_data[self.current_record_index]
+            changed = [c for c, v in enumerate(edited_values)
+                       if v != (old_values[c] if c < len(old_values) else '')]
+            if changed:
+                self.csv_data[self.current_record_index] = edited_values
+                for c in changed:
+                    self._markCellDirty(self.current_record_index, c)
+                self._markModified()
         self.record_edit_mode = False
         self.edit_record_btn.setText("Edit")
         self.record_view.edit_mode = False
@@ -1397,12 +1467,69 @@ class CSVReaderApp(QMainWindow):
     def _saveXLSX(self, file_path):
         if not XLSX_SUPPORT_AVAILABLE:
             raise Exception("XLSX support requires the 'openpyxl' library.")
+        if self.xlsx_source and os.path.exists(self.xlsx_source['path']):
+            self._patchXLSX(file_path)
+        else:
+            self._writeNewXLSX(file_path)
+
+    def _writeNewXLSX(self, file_path):
+        """Write current data to a brand-new workbook (source was CSV)"""
         workbook = openpyxl.Workbook()
         sheet = workbook.active
         sheet.append(self.headers)
         for row in self.csv_data:
-            sheet.append(row)
-        workbook.save(file_path)
+            sheet.append([coerce_cell_value(v, None) for v in row])
+        self._atomicSave(workbook, file_path)
+
+    def _patchXLSX(self, file_path):
+        """Re-open the source workbook and write only edited cells, so other
+        sheets, formulas, formatting and value types are preserved."""
+        src = self.xlsx_source
+        workbook = openpyxl.load_workbook(src['path'])  # full mode: keeps formulas/styles
+        sheet = workbook[src['sheet']]
+        raw = src['raw']
+
+        # Map sheet row -> current row values ([headers] + csv_data)
+        current = dict(zip(self.row_origins, [self.headers] + self.csv_data))
+        written = {}
+        for sheet_row, col in self.dirty_cells:
+            values = current.get(sheet_row)
+            if values is None:
+                continue
+            text = values[col] if col < len(values) else ''
+            orig_row = raw[sheet_row - 1] if sheet_row - 1 < len(raw) else ()
+            original = orig_row[col] if col < len(orig_row) else None
+            value = coerce_cell_value(text, original)
+            sheet.cell(row=sheet_row, column=col + 1).value = value
+            written[(sheet_row, col)] = value
+
+        self._atomicSave(workbook, file_path)
+
+        # The saved file is now the baseline for future saves
+        for (sheet_row, col), value in written.items():
+            row = list(raw[sheet_row - 1]) if sheet_row - 1 < len(raw) else []
+            while len(row) <= col:
+                row.append(None)
+            row[col] = value
+            while len(raw) < sheet_row:
+                raw.append(())
+            raw[sheet_row - 1] = tuple(row)
+        src['path'] = file_path
+        self.dirty_cells = set()
+
+    def _atomicSave(self, workbook, file_path):
+        """Save via a temp file in the same folder so a failed save
+        never leaves a truncated workbook behind."""
+        folder = os.path.dirname(os.path.abspath(file_path))
+        fd, tmp_path = tempfile.mkstemp(suffix='.xlsx', dir=folder)
+        os.close(fd)
+        try:
+            workbook.save(tmp_path)
+            os.replace(tmp_path, file_path)
+        except Exception:
+            if os.path.exists(tmp_path):
+                os.remove(tmp_path)
+            raise
 
     def keyPressEvent(self, event):
         """Handle key press events for navigation"""

@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- **XLSX Save no longer destroys the workbook**: Save previously rebuilt the file from scratch, deleting every sheet but the first, converting numbers and dates to text, replacing formulas with values, and dropping all formatting
+  - Save now re-opens the original workbook and writes only the edited cells
+  - Other sheets, formulas, styles, column widths and number formats are preserved
+  - Edited cells keep their original type (numbers, dates, booleans; text such as zip codes keeps leading zeros)
+  - Edits land on the correct sheet row after a header-row reassignment (H key)
+  - Save As `.xlsx` copies the full workbook with edits applied
+  - Saves go through a temp file, so a failed save cannot leave a truncated workbook
+
 ## [0.1.8a] - 2026-11-11 1102 CST
 
 ### Fixed
