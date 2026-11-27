@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - Save writes edits from every sheet back into the workbook
   - Status bar and title bar show the active sheet
   - Empty and headers-only sheets display instead of failing to open
+- **Formula cells are read-only**: shown in italics with the formula in a tooltip, in both Table and Record View
+  - Workbooks saved by openpyxl (including by this app) carry no cached formula results; those cells now show the formula text instead of appearing blank
+  - Formula detection adds no load time for sheets without formulas
+- **Save As `.csv` from a multi-sheet workbook** is now an export: choose **Current Sheet** or **One File per Sheet** (`name_SheetName.csv`, empty sheets skipped, confirmation before replacing existing files)
+  - The workbook stays open as the current file, and unsaved workbook edits stay marked as unsaved (previously the CSV save cleared the unsaved flag, so edits on other sheets could be lost on close)
 
 ### Fixed
 - **XLSX Save no longer destroys the workbook**: Save previously rebuilt the file from scratch, deleting every sheet but the first, converting numbers and dates to text, replacing formulas with values, and dropping all formatting

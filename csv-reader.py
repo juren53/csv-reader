@@ -87,10 +87,24 @@ def coerce_cell_value(text, original):
     return text
 
 
+def _formulaTip(formula):
+    return f"Formula: {formula}\n(read-only - edit formulas in Excel)"
+
+
+def _styleFormulaItem(item, formula):
+    item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+    item.setToolTip(_formulaTip(formula))
+    font = item.font()
+    font.setItalic(True)
+    item.setFont(font)
+
+
 class TableView(QTableWidget):
     """Widget to display CSV data in a spreadsheet-like table format"""
 
     cellEdited = pyqtSignal(int, int, str)
+    # Optional callable returning {(data_row, col): formula} for read-only cells
+    locked_provider = None
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -171,6 +185,8 @@ class TableView(QTableWidget):
             # Set headers
             self.setHorizontalHeaderLabels(headers)
 
+            locked = self.locked_provider() if self.locked_provider else {}
+
             # Populate table with data
             for row_idx, row_data in enumerate(data):
                 # Ensure row has enough columns
@@ -180,6 +196,9 @@ class TableView(QTableWidget):
                 for col_idx, cell_value in enumerate(row_data):
                     item = QTableWidgetItem(str(cell_value))
                     item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+                    formula = locked.get((row_idx, col_idx))
+                    if formula is not None:
+                        _styleFormulaItem(item, formula)
                     self.setItem(row_idx, col_idx, item)
 
             # Resize columns to content
@@ -338,7 +357,7 @@ class RecordView(QScrollArea):
             return True
         return False
         
-    def displayRecord(self, headers, record):
+    def displayRecord(self, headers, record, locked=None):
         """Display a record with headers as labels (or editors in edit mode)"""
         scrollbar = self.verticalScrollBar()
         saved_scroll_position = scrollbar.value()
@@ -367,6 +386,16 @@ class RecordView(QScrollArea):
                 value_widget.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
                 value_widget.setWordWrap(True)
                 value_widget.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+
+            formula = locked.get(row) if locked else None
+            if formula is not None:
+                if self.edit_mode:
+                    value_widget.setReadOnly(True)
+                    value_widget.setEnabled(False)
+                value_widget.setToolTip(_formulaTip(formula))
+                font = value_widget.font()
+                font.setItalic(True)
+                value_widget.setFont(font)
 
             self.grid_layout.addWidget(header_label, row, 0)
             self.grid_layout.addWidget(value_widget, row, 1)
@@ -505,6 +534,7 @@ class CSVReaderApp(QMainWindow):
         # Connect table row click to record view
         self.table_view.cellClicked.connect(self.onTableCellClicked)
         self.table_view.cellEdited.connect(self._onTableCellEdited)
+        self.table_view.locked_provider = self._lockedCells
         
         # Initially show only record view
         self.views_layout.addWidget(self.record_view)
@@ -886,7 +916,7 @@ class CSVReaderApp(QMainWindow):
 <h3>Supported File Formats</h3>
 <ul>
 <li><b>CSV Files</b>: Standard comma-separated values files (.csv)</li>
-<li><b>Excel Files</b>: Excel workbook files (.xlsx) - all sheets; switch with the tabs at the bottom or Ctrl+PgUp / Ctrl+PgDn</li>
+<li><b>Excel Files</b>: Excel workbook files (.xlsx) - all sheets; switch with the tabs at the bottom or Ctrl+PgUp / Ctrl+PgDn. Formula cells are shown in italics and are read-only. Save As .csv offers the current sheet or one file per sheet.</li>
 </ul>
 
 <h3>View Modes</h3>
@@ -1108,17 +1138,17 @@ class CSVReaderApp(QMainWindow):
             )
 
         try:
-            workbook = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+            formula_wb = openpyxl.load_workbook(file_path, read_only=True)
         except Exception as e:
             raise Exception(f"Failed to open XLSX file: {str(e)}")
 
         try:
-            if len(workbook.sheetnames) == 0:
+            if len(formula_wb.sheetnames) == 0:
                 raise Exception("XLSX file contains no sheets")
-            sheets = [self._newSheetState(name) for name in workbook.sheetnames]
-            self._fillSheetState(sheets[0], workbook[sheets[0]['name']])
+            sheets = [self._newSheetState(name) for name in formula_wb.sheetnames]
+            self._readSheet(sheets[0], file_path, formula_wb)
         finally:
-            workbook.close()
+            formula_wb.close()
 
         self.xlsx_source = {'path': file_path, 'sheets': sheets, 'active': 0}
         self._restoreSheet(0)
@@ -1126,22 +1156,57 @@ class CSVReaderApp(QMainWindow):
     @staticmethod
     def _newSheetState(name):
         return {'name': name, 'loaded': False, 'headers': [], 'data': [],
-                'record_index': 0, 'raw': [], 'row_origins': [], 'dirty_cells': set()}
+                'record_index': 0, 'raw': [], 'row_origins': [], 'dirty_cells': set(),
+                'formulas': {}}
 
     @staticmethod
-    def _fillSheetState(state, sheet):
-        """Read a worksheet into a sheet-state dict"""
+    def _fillSheetState(state, formula_sheet, cached_sheet_fn):
+        """Read a worksheet into a sheet-state dict.
+
+        `formula_sheet` is the sheet read with formulas as text. Only when it
+        contains formulas is `cached_sheet_fn()` called for the same sheet with
+        cached (calculated) values, so formula-free sheets are read once."""
+        # Pass 1: values and formula candidates. Start at A1 so index == sheet row - 1
+        rows = []
+        candidates = {}  # {sheet_row: {col: formula text}}
+        for sheet_row, frow in enumerate(
+                formula_sheet.iter_rows(min_row=1, min_col=1, values_only=True), 1):
+            row = list(frow)
+            for col, fval in enumerate(row):
+                ftext = getattr(fval, 'text', fval)  # ArrayFormula has .text
+                if isinstance(ftext, str) and ftext.startswith('='):
+                    candidates.setdefault(sheet_row, {})[col] = ftext
+            rows.append(row)
+
+        # Pass 2 (only if needed): swap formula text for cached values
+        formulas = {}
+        no_cache = set()
+        if candidates:
+            cached_rows = cached_sheet_fn().iter_rows(min_row=1, min_col=1, values_only=True)
+            for sheet_row, crow in enumerate(cached_rows, 1):
+                for col, ftext in candidates.get(sheet_row, {}).items():
+                    cached = crow[col] if col < len(crow) else None
+                    if isinstance(cached, str) and cached == ftext:
+                        continue  # a literal string that starts with "=", not a formula
+                    formulas.setdefault(sheet_row, {})[col] = ftext
+                    rows[sheet_row - 1][col] = cached
+                    if cached is None:
+                        no_cache.add((sheet_row, col))
+
         raw = []
         data = []
-        # Start at A1 so list index == sheet row - 1
-        for row in sheet.iter_rows(min_row=1, min_col=1, values_only=True):
-            raw.append(row)
-            data.append([str(cell) if cell is not None else '' for cell in row])
+        for sheet_row, row in enumerate(rows, 1):
+            text = [str(cell) if cell is not None else '' for cell in row]
+            for col, ftext in formulas.get(sheet_row, {}).items():
+                if (sheet_row, col) in no_cache:
+                    text[col] = ftext  # no cached value (e.g. saved by openpyxl)
+            raw.append(tuple(row))
+            data.append(text)
         # Drop trailing all-blank rows (formatting-only rows inflate max_row)
         while data and not any(data[-1]):
             data.pop()
             raw.pop()
-        state.update(loaded=True, raw=raw,
+        state.update(loaded=True, raw=raw, formulas=formulas,
                      headers=data[0] if data else [],
                      data=data[1:],
                      row_origins=list(range(1, len(data) + 1)),
@@ -1151,11 +1216,39 @@ class CSVReaderApp(QMainWindow):
         state = self.xlsx_source['sheets'][index]
         if state['loaded']:
             return
-        workbook = openpyxl.load_workbook(self.xlsx_source['path'], read_only=True, data_only=True)
+        formula_wb = openpyxl.load_workbook(self.xlsx_source['path'], read_only=True)
         try:
-            self._fillSheetState(state, workbook[state['name']])
+            self._readSheet(state, self.xlsx_source['path'], formula_wb)
         finally:
-            workbook.close()
+            formula_wb.close()
+
+    def _readSheet(self, state, file_path, formula_wb):
+        """Fill `state` from its sheet, opening the cached-values copy only if needed"""
+        cached_wb = None
+
+        def cached_sheet():
+            nonlocal cached_wb
+            cached_wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
+            return cached_wb[state['name']]
+
+        try:
+            self._fillSheetState(state, formula_wb[state['name']], cached_sheet)
+        finally:
+            if cached_wb is not None:
+                cached_wb.close()
+
+    def _lockedCells(self):
+        """Formula cells of the active sheet as {(data_row, col): formula}"""
+        if not self.xlsx_source:
+            return {}
+        formulas = self.xlsx_source['sheets'][self.xlsx_source['active']]['formulas']
+        if not formulas:
+            return {}
+        locked = {}
+        for data_row, sheet_row in enumerate(self.row_origins[1:]):
+            for col, formula in formulas.get(sheet_row, {}).items():
+                locked[(data_row, col)] = formula
+        return locked
 
     def _stashActiveSheet(self):
         """Copy the working globals back into the active sheet's state"""
@@ -1327,7 +1420,10 @@ class CSVReaderApp(QMainWindow):
                 record = record + [''] * (len(self.headers) - len(record))
                 
             # Update the record view
-            self.record_view.displayRecord(self.headers, record)
+            self.record_view.displayRecord(
+                self.headers, record,
+                locked={c: f for (r, c), f in self._lockedCells().items()
+                        if r == self.current_record_index})
             
             # Update navigation label
             self.nav_label.setText(f"Record {self.current_record_index + 1} of {len(self.csv_data)}")
@@ -1597,15 +1693,106 @@ class CSVReaderApp(QMainWindow):
             "CSV Files (*.csv);;Excel Files (*.xlsx);;All Files (*)"
         )
         if file_path:
+            is_csv = os.path.splitext(file_path)[1].lower() != '.xlsx'
+            if is_csv and self.xlsx_source and len(self.xlsx_source['sheets']) > 1:
+                self._exportWorkbookCSV(file_path)
+                return
             self.current_file_path = file_path
             self._updateTitle()
             self.saveFile()
 
     def _saveCSV(self, file_path):
+        self._writeCSV(file_path, self.headers, self.csv_data)
+
+    @staticmethod
+    def _writeCSV(file_path, headers, data):
         with open(file_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
-            writer.writerow(self.headers)
-            writer.writerows(self.csv_data)
+            writer.writerow(headers)
+            writer.writerows(data)
+
+    def _askCSVExportMode(self, sheet_count, sheet_name):
+        """Ask how to export a multi-sheet workbook to CSV.
+        Returns 'current', 'each' or None (cancel)."""
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Question)
+        box.setWindowTitle("Export to CSV")
+        text = (f"This workbook has {sheet_count} sheets, but a CSV file holds only one.\n\n"
+                f"The workbook stays open; this is an export.")
+        if self.is_modified:
+            text += "\nYour workbook edits are still unsaved - use Save to keep them in the .xlsx file."
+        box.setText(text)
+        current_btn = box.addButton(f"Current Sheet ({sheet_name})", QMessageBox.ButtonRole.AcceptRole)
+        each_btn = box.addButton("One File per Sheet", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton(QMessageBox.StandardButton.Cancel)
+        box.setDefaultButton(current_btn)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is current_btn:
+            return 'current'
+        if clicked is each_btn:
+            return 'each'
+        return None
+
+    def _confirmOverwrite(self, paths):
+        names = "\n".join(os.path.basename(p) for p in paths[:8])
+        if len(paths) > 8:
+            names += f"\n... and {len(paths) - 8} more"
+        reply = QMessageBox.question(
+            self, "Replace Files?",
+            f"These files already exist and will be replaced:\n\n{names}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel)
+        return reply == QMessageBox.StandardButton.Yes
+
+    @staticmethod
+    def _perSheetCSVPaths(file_path, sheet_names):
+        """report.csv + ['Orders', 'Q1/Q2'] -> report_Orders.csv, report_Q1_Q2.csv"""
+        base, ext = os.path.splitext(file_path)
+        ext = ext or '.csv'
+        paths, used = [], set()
+        for name in sheet_names:
+            safe = re.sub(r'[\\/:*?"<>|\s]+', '_', name).strip('._') or 'Sheet'
+            candidate, n = f"{base}_{safe}{ext}", 2
+            while candidate.lower() in used:
+                candidate, n = f"{base}_{safe}_{n}{ext}", n + 1
+            used.add(candidate.lower())
+            paths.append(candidate)
+        return paths
+
+    def _exportWorkbookCSV(self, file_path):
+        """Save As .csv for a multi-sheet workbook: export without leaving the workbook"""
+        self._finishTableEdit()
+        if self.record_edit_mode:
+            self._commitRecordEdits()
+        src = self.xlsx_source
+        active_name = src['sheets'][src['active']]['name']
+        mode = self._askCSVExportMode(len(src['sheets']), active_name)
+        if mode is None:
+            return
+        try:
+            if mode == 'current':
+                self._saveCSV(file_path)
+                self.statusBar().showMessage(
+                    f"Exported sheet '{active_name}' to {os.path.basename(file_path)}", 5000)
+                return
+
+            self._stashActiveSheet()
+            for i in range(len(src['sheets'])):
+                self._ensureSheetLoaded(i)
+            sheets = [s for s in src['sheets'] if s['headers'] or s['data']]
+            skipped = len(src['sheets']) - len(sheets)
+            paths = self._perSheetCSVPaths(file_path, [s['name'] for s in sheets])
+            existing = [p for p in paths if os.path.exists(p)]
+            if existing and not self._confirmOverwrite(existing):
+                return
+            for state, path in zip(sheets, paths):
+                self._writeCSV(path, state['headers'], state['data'])
+            msg = f"Exported {len(paths)} sheets to {os.path.dirname(os.path.abspath(file_path))}"
+            if skipped:
+                msg += f" ({skipped} empty sheet{'s' if skipped > 1 else ''} skipped)"
+            self.statusBar().showMessage(msg, 8000)
+        except Exception as e:
+            QMessageBox.critical(self, "Export Error", f"Failed to export CSV: {str(e)}")
 
     def _saveXLSX(self, file_path):
         if not XLSX_SUPPORT_AVAILABLE:
