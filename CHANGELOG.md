@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [0.1.9a] - 2026-11-27 0752 CST
+
+### Fixed
+- **`csv-reader.bat`**: Launcher was hardcoded to a Windows Store Python under an old user profile and failed with "The system cannot find the path specified." It now runs with the project venv (`venv\Scripts\python.exe`), falling back to the `py` launcher
+
+### Build
+- **Windows executable**: `csv-reader.exe` attached to this release (no application changes since v0.1.9)
+
 ## [0.1.9] - 2026-11-26 2033 CST
 
 ### Added
@@ -305,6 +313,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Auto-resize columns to content
 - Independent zoom levels for each view mode
 
+[0.1.9a]: https://github.com/juren53/csv-reader/releases/tag/v0.1.9a
 [0.1.9]: https://github.com/juren53/csv-reader/releases/tag/v0.1.9
 [0.1.8a]: https://github.com/juren53/csv-reader/releases/tag/v0.1.8a
 [0.1.8]: https://github.com/juren53/csv-reader/releases/tag/v0.1.8

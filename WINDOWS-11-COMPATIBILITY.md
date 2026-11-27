@@ -127,5 +127,5 @@ pyinstaller --onefile --windowed --icon=icons/ICON_csv-reader.ico csv-reader.py
 ---
 
 **Last Updated:** 2026-11-26
-**Version:** v0.1.9
+**Version:** v0.1.9a
 **Platform:** Cross-platform (Linux primary, Windows 11 target)
