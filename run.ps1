@@ -113,8 +113,9 @@ if (-not (Test-Path $Marker)) {
 
 if ($installDeps) {
     Write-Host "[$AppName] Installing dependencies..."
-    pip install --upgrade pip -q
-    pip install -r $Requirements -q
+    # Use "python -m pip": pip.exe can't overwrite itself on Windows while running
+    python -m pip install --upgrade pip -q --disable-pip-version-check
+    python -m pip install -r $Requirements -q --disable-pip-version-check
     New-Item -ItemType File -Path $Marker -Force | Out-Null
 }
 
